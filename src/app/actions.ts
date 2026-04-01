@@ -5,13 +5,43 @@ import { runAnalysisEngine, type AIAnalysisResult } from "@/lib/analysis/engine"
 import { supabase } from "@/lib/supabase";
 
 import { fetchFearGreedIndex, type FearGreedResponse } from "@/lib/api/feargreed";
-import { fetchMarketFunds, fetchDailyCreditBalance, fetchInvestorRanking, type MarketFundsData, type CreditBalanceData, type InvestorFlowData } from "@/lib/api/kis-market";
+import { 
+  fetchMarketFunds, 
+  fetchDailyCreditBalance, 
+  fetchInvestorRanking, 
+  fetchMajorIndex,
+  fetchExchangeRate,
+  type MarketFundsData, 
+  type CreditBalanceData, 
+  type InvestorFlowData,
+  type IndexPriceData
+} from "@/lib/api/kis-market";
 
 export interface StockAnalysisResponse {
   success: boolean;
   stockData?: any; // KIS Data
   analysis?: AIAnalysisResult;
   error?: string;
+}
+
+/**
+ * [마켓 오버뷰] 상단 지수 4종 서버 액션
+ */
+export async function fetchMarketOverviewAction(): Promise<IndexPriceData[]> {
+  try {
+    const results = await Promise.all([
+      fetchMajorIndex("0001", "코스피"),
+      fetchMajorIndex("1001", "코스닥"),
+      fetchMajorIndex("2001", "코스피200"),
+      fetchExchangeRate(),
+    ]);
+
+    // null 필터링 (에러 시 더미 혹은 빈 값 방어)
+    return results.filter((r): r is IndexPriceData => r !== null);
+  } catch (error) {
+    console.error("fetchMarketOverviewAction error:", error);
+    return [];
+  }
 }
 
 export async function analyzeStockAction(code: string): Promise<StockAnalysisResponse> {

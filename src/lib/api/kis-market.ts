@@ -27,7 +27,102 @@ export interface InvestorFlowData {
   amount: number;       // 순매수 금액 (백만 단위일 수 있음)
 }
 
+export interface IndexPriceData {
+  label: string;
+  value: string;
+  change: string;
+  changePercent: string;
+  direction: "up" | "down" | "flat";
+}
+
 // --- [Functions] ---
+
+/**
+ * 국내 주요 지수를 가져옵니다. (코스피, 코스닥, 코스피200)
+ * TR_ID: FHPST01710000 (국내지수 현재가)
+ */
+export async function fetchMajorIndex(code: string, label: string): Promise<IndexPriceData | null> {
+  const token = await getAccessToken();
+  const appKey = process.env.KIS_APP_KEY!;
+  const appSecret = process.env.KIS_APP_SECRET!;
+
+  const url = `${KIS_BASE_URL}/uapi/domestic-stock/v1/quotations/inquire-index-price?FID_COND_MRKT_DIV_CODE=U&FID_INPUT_ISCD=${code}`;
+
+  const headers = {
+    "Content-Type": "application/json",
+    authorization: `Bearer ${token}`,
+    appkey: appKey,
+    appsecret: appSecret,
+    tr_id: "FHPST01710000",
+  };
+
+  try {
+    const res = await fetch(url, { headers, cache: "no-store" });
+    if (!res.ok) return null;
+
+    const data = await res.json();
+    if (data.rt_cd !== "0" || !data.output) return null;
+
+    const out = data.output;
+    const prdy_vrss = Number(out.prdy_vrss); // 전일 대비
+    const direction: "up" | "down" | "flat" = prdy_vrss > 0 ? "up" : prdy_vrss < 0 ? "down" : "flat";
+
+    return {
+      label,
+      value: Number(out.bstp_nmix_prpr).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+      change: (prdy_vrss > 0 ? "+" : "") + prdy_vrss.toFixed(2),
+      changePercent: (prdy_vrss > 0 ? "+" : "") + out.bstp_nmix_prdy_ctrt + "%",
+      direction
+    };
+  } catch (error) {
+    console.error(`fetchMajorIndex(${code}) error:`, error);
+    return null;
+  }
+}
+
+/**
+ * 주요 환율 정보를 가져옵니다. (원/달러)
+ * TR_ID: FHPST04010100 (외환/금리 가격)
+ */
+export async function fetchExchangeRate(): Promise<IndexPriceData | null> {
+  const token = await getAccessToken();
+  const appKey = process.env.KIS_APP_KEY!;
+  const appSecret = process.env.KIS_APP_SECRET!;
+
+  // FID_INPUT_ISCD=FX@KRW (원/달러)
+  const url = `${KIS_BASE_URL}/uapi/domestic-stock/v1/quotations/inquire-daily-indexprice?FID_COND_MRKT_DIV_CODE=X&FID_INPUT_ISCD=FX@KRW&FID_PERIOD_DIV_CODE=D`;
+
+  const headers = {
+    "Content-Type": "application/json",
+    authorization: `Bearer ${token}`,
+    appkey: appKey,
+    appsecret: appSecret,
+    tr_id: "FHPST04010100",
+  };
+
+  try {
+    const res = await fetch(url, { headers, cache: "no-store" });
+    if (!res.ok) return null;
+
+    const data = await res.json();
+    if (data.rt_cd !== "0" || !data.output1) return null;
+
+    const out = data.output1;
+    const prdy_vrss = Number(out.prdy_vrss);
+    const direction: "up" | "down" | "flat" = prdy_vrss > 0 ? "up" : prdy_vrss < 0 ? "down" : "flat";
+
+    return {
+      label: "원/달러",
+      value: Number(out.ovrs_nmix_prpr).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+      change: (prdy_vrss > 0 ? "+" : "") + prdy_vrss.toFixed(2),
+      changePercent: (prdy_vrss > 0 ? "+" : "") + out.ovrs_nmix_prdy_ctrt + "%",
+      direction
+    };
+  } catch (error) {
+    console.error("fetchExchangeRate error:", error);
+    return null;
+  }
+}
 
 /**
  * 국내 증시자금 종합 데이터를 가져옵니다. (고객예탁금 등)

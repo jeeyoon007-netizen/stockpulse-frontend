@@ -33,21 +33,15 @@ import {
   analyzeStockAction, 
   type StockAnalysisResponse, 
   fetchFearGreedAction, 
-  fetchCanaryDataAction 
+  fetchCanaryDataAction,
+  fetchMarketOverviewAction
 } from "./actions";
 import { TradingViewChart } from "@/components/tradingview-chart";
 import { FearGreedGauge } from "@/components/fear-greed-gauge";
 import { CanaryCard } from "@/components/canary-card";
 import { InvestorFlowCard } from "@/components/investor-flow-card";
 import { type FearGreedResponse } from "@/lib/api/feargreed";
-
-// --- [Dummy Data] ---
-const marketOverview = [
-  { label: "코스피", value: "2,687.45", change: "+12.34", changePercent: "+0.46%", direction: "up" as const },
-  { label: "코스닥", value: "872.31", change: "-3.21", changePercent: "-0.37%", direction: "down" as const },
-  { label: "코스피200", value: "362.18", change: "+1.87", changePercent: "+0.52%", direction: "up" as const },
-  { label: "원/달러", value: "1,432.50", change: "0.00", changePercent: "0.00%", direction: "flat" as const },
-];
+import { type IndexPriceData } from "@/lib/api/kis-market";
 
 function DirectionIcon({ direction }: { direction: "up" | "down" | "flat" }) {
   if (direction === "up") return <TrendingUp className="w-4 h-4" />;
@@ -66,11 +60,13 @@ export default function DashboardPage() {
   const [stocks, setStocks] = useState<{code: string, name: string, market: string}[]>([]);
 
   // --- [Market Indicators State] ---
+  const [marketOverview, setMarketOverview] = useState<IndexPriceData[]>([]);
   const [fearGreedData, setFearGreedData] = useState<FearGreedResponse | null>(null);
   const [canaryData, setCanaryData] = useState<{funds: any, creditHistory: any[]}>({ funds: null, creditHistory: [] });
 
   useEffect(() => {
     setTimeStr(new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" }));
+    
     // 종목 마스터 JSON 로드
     fetch("/stocks.json")
       .then(res => res.json())
@@ -78,6 +74,7 @@ export default function DashboardPage() {
       .catch(err => console.error("stocks.json 로드 실패:", err));
 
     // 시장 지표 로드
+    fetchMarketOverviewAction().then(setMarketOverview);
     fetchFearGreedAction().then(setFearGreedData);
     fetchCanaryDataAction().then(setCanaryData);
   }, []);
@@ -155,6 +152,36 @@ export default function DashboardPage() {
           <div className="w-1.5 h-1.5 rounded-full bg-stock-up animate-pulse" />
         </div>
       </header>
+
+      {/* Market Overview (Real-time Indexes) */}
+      <section id="market-overview" className="animate-in fade-in slide-in-from-top-4 duration-700">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {marketOverview.length > 0 ? marketOverview.map((item) => (
+            <Card
+              key={item.label}
+              className="card-glow border-border/50 hover:border-primary/30 transition-all duration-300 bg-background/30 shadow-sm"
+            >
+              <CardContent className="p-4">
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-bold text-muted-foreground mb-1 uppercase tracking-widest">{item.label}</span>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xl font-black tracking-tighter font-mono">{item.value}</span>
+                    <div className={`flex items-center gap-1 text-[10px] font-black ${directionColor(item.direction)}`}>
+                        <DirectionIcon direction={item.direction} />
+                        {item.changePercent}
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )) : (
+            // Loading skeleton
+            [...Array(4)].map((_, i) => (
+                <div key={i} className="h-20 bg-muted/20 animate-pulse rounded-xl border border-border/50"></div>
+            ))
+          )}
+        </div>
+      </section>
 
       {/* Top Section: Analysis Engine */}
       <section className="space-y-4">
@@ -397,29 +424,6 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      {/* Market Overview (Simplified Indexes) */}
-      <section id="market-overview">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {marketOverview.map((item) => (
-            <Card
-              key={item.label}
-              className="card-glow border-border/50 hover:border-primary/30 transition-all duration-300 bg-background/30"
-            >
-              <CardContent className="p-4">
-                <div className="flex flex-col">
-                  <span className="text-[10px] font-bold text-muted-foreground mb-1 uppercase tracking-wider">{item.label}</span>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xl font-black tracking-tighter font-mono">{item.value}</span>
-                    <div className={`flex items-center gap-1 text-[10px] font-black ${directionColor(item.direction)}`}>
-                        {item.changePercent}
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </section>
     </div>
   );
 }
