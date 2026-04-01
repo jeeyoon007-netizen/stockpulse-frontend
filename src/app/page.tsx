@@ -62,7 +62,14 @@ export default function DashboardPage() {
   // --- [Market Indicators State] ---
   const [marketOverview, setMarketOverview] = useState<IndexPriceData[]>([]);
   const [fearGreedData, setFearGreedData] = useState<FearGreedResponse | null>(null);
-  const [canaryData, setCanaryData] = useState<{funds: any, creditHistory: any[]}>({ funds: null, creditHistory: [] });
+  const [canaryData, setCanaryData] = useState<any>({ 
+    funds: null, 
+    creditHistory: [], 
+    adr: "0", 
+    adrSignal: "대기 중", 
+    advanceCount: 0, 
+    declineCount: 0 
+  });
 
   useEffect(() => {
     setTimeStr(new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" }));

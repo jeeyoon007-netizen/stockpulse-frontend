@@ -107,18 +107,48 @@ export async function fetchFearGreedAction(): Promise<FearGreedResponse | null> 
 }
 
 /**
- * [카나리아] 시장 자금 및 신용잔고 서버 액션
+ * [카나리아] 시장 자금, 신용잔고 및 ADR 서버 액션
  */
 export async function fetchCanaryDataAction() {
   try {
-    const [funds, creditHistory] = await Promise.all([
+    const [funds, creditHistory, kospiInfo] = await Promise.all([
       fetchMarketFunds(),
-      fetchDailyCreditBalance(20)
+      fetchDailyCreditBalance(20),
+      fetchMajorIndex("0001", "코스피")
     ]);
-    return { funds, creditHistory };
+
+    // ADR 계산 (상승 종목 수 / 하락 종목 수)
+    let adr = 0;
+    let adrSignal = "데이터 부족";
+    
+    if (kospiInfo && kospiInfo.advanceCount && kospiInfo.declineCount) {
+        const adv = kospiInfo.advanceCount;
+        const dec = kospiInfo.declineCount;
+        adr = (adv / dec) * 100;
+        
+        if (adr >= 120) adrSignal = "매도 검토 (과열)";
+        else if (adr <= 80) adrSignal = "바닥권 신호 (과매도)";
+        else adrSignal = "중립";
+    }
+
+    return { 
+        funds, 
+        creditHistory, 
+        adr: adr.toFixed(1), 
+        adrSignal,
+        advanceCount: kospiInfo?.advanceCount || 0,
+        declineCount: kospiInfo?.declineCount || 0
+    };
   } catch (error) {
     console.error("fetchCanaryDataAction error:", error);
-    return { funds: null, creditHistory: [] };
+    return { 
+        funds: null, 
+        creditHistory: [], 
+        adr: "0", 
+        adrSignal: "오류",
+        advanceCount: 0,
+        declineCount: 0
+    };
   }
 }
 
