@@ -67,7 +67,7 @@ export async function fetchMajorIndex(code: string, label: string): Promise<Inde
 
     // 만약 현재가 데이터가 없거나 에러면 (장 종료 등), 일별 시세에서 최신값 가져오기 시도
     if (data.rt_cd !== "0" || !data.output) {
-      console.warn(`fetchMajorIndex(${label}) 현재가 조회 실패, 일별 시세로 전환 시도...`);
+      console.warn(`fetchMajorIndex(${label}) KIS 에러: [${data.rt_cd}] ${data.msg1}. 일별 시세로 전환합니다.`);
       return fetchMajorIndexLatest(code, label);
     }
 
@@ -107,7 +107,7 @@ async function fetchMajorIndexLatest(code: string, label: string): Promise<Index
     authorization: `Bearer ${token}`,
     appkey: appKey,
     appsecret: appSecret,
-    tr_id: "FHPST01710300",
+    tr_id: "FHPST01740000",
     custtype: "P",
   };
 
@@ -115,7 +115,10 @@ async function fetchMajorIndexLatest(code: string, label: string): Promise<Index
     const res = await fetch(url, { headers, cache: "no-store" });
     if (!res.ok) return null;
     const data = await res.json();
-    if (data.rt_cd !== "0" || !data.output1 || !data.output1[0]) return null;
+    if (data.rt_cd !== "0" || !data.output1 || !data.output1[0]) {
+      console.error(`fetchMajorIndexLatest(${label}) KIS 에러: [${data.rt_cd}] ${data.msg1}`);
+      return null;
+    }
 
     const out = data.output1[0]; // 최신 영업일
     const prpr = Number(out.bstp_nmix_prpr || 0);
@@ -158,7 +161,10 @@ export async function fetchExchangeRate(): Promise<IndexPriceData | null> {
     if (!res.ok) return null;
 
     const data = await res.json();
-    if (data.rt_cd !== "0" || !data.output1) return null;
+    if (data.rt_cd !== "0" || !data.output1) {
+      console.error(`fetchExchangeRate KIS 에러: [${data.rt_cd}] ${data.msg1}`);
+      return null;
+    }
 
     const out = Array.isArray(data.output1) ? data.output1[0] : data.output1;
     const prpr = Number(out.ovrs_nmix_prpr || 0);
