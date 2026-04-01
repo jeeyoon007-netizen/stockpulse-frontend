@@ -64,11 +64,11 @@ export async function fetchMajorIndex(code: string, label: string): Promise<Inde
     if (!res.ok) return null;
 
     const data = await res.json();
-    
+
     // 만약 현재가 데이터가 없거나 에러면 (장 종료 등), 일별 시세에서 최신값 가져오기 시도
     if (data.rt_cd !== "0" || !data.output) {
-        console.warn(`fetchMajorIndex(${label}) 현재가 조회 실패, 일별 시세로 전환 시도...`);
-        return fetchMajorIndexLatest(code, label);
+      console.warn(`fetchMajorIndex(${label}) 현재가 조회 실패, 일별 시세로 전환 시도...`);
+      return fetchMajorIndexLatest(code, label);
     }
 
     const out = data.output;
@@ -107,7 +107,7 @@ async function fetchMajorIndexLatest(code: string, label: string): Promise<Index
     authorization: `Bearer ${token}`,
     appkey: appKey,
     appsecret: appSecret,
-    tr_id: "FHPST01710300", 
+    tr_id: "FHPST01710300",
     custtype: "P",
   };
 
@@ -186,7 +186,7 @@ export async function fetchMarketFunds(): Promise<MarketFundsData | null> {
   const appSecret = process.env.KIS_APP_SECRET!;
 
   const url = `${KIS_BASE_URL}/uapi/domestic-stock/v1/quotations/mktfunds`;
-  
+
   const headers = {
     "Content-Type": "application/json",
     authorization: `Bearer ${token}`,
@@ -204,7 +204,7 @@ export async function fetchMarketFunds(): Promise<MarketFundsData | null> {
     if (data.rt_cd !== "0" || !data.output) return null;
 
     const latest = Array.isArray(data.output) ? data.output[0] : data.output;
-    
+
     return {
       date: latest.stck_bsop_date,
       deposit: Number(latest.cstmr_u_ast_amt || 0),

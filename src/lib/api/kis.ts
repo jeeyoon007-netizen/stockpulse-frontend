@@ -129,10 +129,10 @@ export async function fetchStockOHLCV(code: string, daysRequired = 240): Promise
     }
 
     const url = `${KIS_BASE_URL}/uapi/domestic-stock/v1/quotations/inquire-daily-itemchartprice?${searchParams.toString()}`;
-    
+
     const res = await fetch(url, { headers, cache: "no-store" });
     if (!res.ok) {
-        throw new AnalysisError(`주가 조회 실패: ${res.status}`);
+      throw new AnalysisError(`주가 조회 실패: ${res.status}`);
     }
 
     const data = await res.json();
@@ -142,13 +142,13 @@ export async function fetchStockOHLCV(code: string, daysRequired = 240): Promise
 
     const dailyData = data.output2;
     if (!dailyData || !Array.isArray(dailyData) || dailyData.length === 0) {
-      break; 
+      break;
     }
 
     for (const item of dailyData) {
       // API에서 값이 빈 문자열로 올경우 방어
       if (!item.stck_bsop_date) continue;
-      
+
       const open = Number(item.stck_oprc);
       const high = Number(item.stck_hgpr);
       const low = Number(item.stck_lwpr);
@@ -189,16 +189,16 @@ export async function fetchStockOHLCV(code: string, daysRequired = 240): Promise
     const oldYear = parseInt(oldestDateStr.slice(0, 4));
     const oldMonth = parseInt(oldestDateStr.slice(4, 6)) - 1;
     const oldDay = parseInt(oldestDateStr.slice(6, 8));
-    
+
     const prevDate = new Date(oldYear, oldMonth, oldDay);
     prevDate.setDate(prevDate.getDate() - 1);
-    
+
     searchParams.set("FID_INPUT_DATE_2", formatYYYYMMDD(prevDate));
     isNext = true;
   }
 
   if (ohlcvList.length < 60) {
-      throw new AnalysisError(`데이터 부족: 최소 60일의 데이터가 필요하나 ${ohlcvList.length}일치만 수집되었습니다.`);
+    throw new AnalysisError(`데이터 부족: 최소 60일의 데이터가 필요하나 ${ohlcvList.length}일치만 수집되었습니다.`);
   }
 
   // 데이터는 내림차순(최신이 앞)으로 오므로, 시간 오름차순(과거->최신)으로 뒤집기
@@ -209,13 +209,13 @@ export async function fetchStockOHLCV(code: string, daysRequired = 240): Promise
   const prevPrice = ohlcvList[ohlcvList.length - 2]?.close || currentPrice;
   const change = currentPrice - prevPrice;
   const changePercent = (change / prevPrice) * 100;
-  
+
   // // 현재 출력에는 종목명이 안나오므로 단순처리 (API에서 output1에 이름이 보통 없음, 조회가 별도 필요하나 생략)
   // 이름을 구하려면 주식기본조회 API가 필요. 현 구상에서는 클라이언트에서 보낸 이름을 신뢰.
 
   return {
     code,
-    name: "검색된 종목", 
+    name: "검색된 종목",
     currentPrice,
     change,
     changePercent: parseFloat(changePercent.toFixed(2)),
