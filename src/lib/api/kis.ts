@@ -1,6 +1,6 @@
 import "server-only";
 
-const KIS_BASE_URL = "https://openapi.koreainvestment.com:9443";
+export const KIS_BASE_URL = "https://openapi.koreainvestment.com:9443";
 
 // 서버 전용 인메모리 캐싱 (개발 환경 핫 리로드 시 초기화될 수 있음)
 let cachedToken = "";
@@ -16,7 +16,7 @@ export class AnalysisError extends Error {
 /**
  * 한국투자증권 API OAuth 2.0 Access Token 발급
  */
-async function getAccessToken() {
+export async function getAccessToken() {
   const now = Date.now();
   if (cachedToken && now < tokenExpiry) {
     return cachedToken;
@@ -74,7 +74,7 @@ export interface StockData {
 }
 
 // YYYYMMDD 포맷 도우미
-function formatYYYYMMDD(date: Date) {
+export function formatYYYYMMDD(date: Date) {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, "0");
   const d = String(date.getDate()).padStart(2, "0");
