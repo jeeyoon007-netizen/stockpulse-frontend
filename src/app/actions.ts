@@ -49,17 +49,21 @@ export async function analyzeStockAction(code: string): Promise<StockAnalysisRes
     const stockData = await fetchStockOHLCV(code, 240);
     const result = runAnalysisEngine(stockData.ohlcv);
 
-    const { error: dbError } = await supabase.from('analysis_logs').insert({
-        stock_code: code,
-        stock_name: stockData.name,
-        current_price: stockData.currentPrice,
-        audit_logs: result.auditLogs,
-        strategy_scenario: result.strategy,
-        experts_opinion: result.experts
-    });
+    if (supabase) {
+        const { error: dbError } = await supabase.from('analysis_logs').insert({
+            stock_code: code,
+            stock_name: stockData.name,
+            current_price: stockData.currentPrice,
+            audit_logs: result.auditLogs,
+            strategy_scenario: result.strategy,
+            experts_opinion: result.experts
+        });
 
-    if (dbError) {
-        console.error("분석 결과 DB 저장 실패:", dbError.message);
+        if (dbError) {
+            console.error("분석 결과 DB 저장 실패:", dbError.message);
+        }
+    } else {
+        console.info("Supabase 미설정으로 로그 저장을 건너뜁니다.");
     }
 
     return { 

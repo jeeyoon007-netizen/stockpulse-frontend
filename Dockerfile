@@ -7,19 +7,12 @@ WORKDIR /app
 COPY package.json package-lock.json* ./
 RUN npm ci
 
-# 2. 빌드 단계 (환경 변수 주입 구간)
+# 2. 빌드 단계
 FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# [중요] 허깅페이스 Settings에 등록한 Secrets를 빌드 시점에 가져옵니다.
-ARG NEXT_PUBLIC_SUPABASE_URL
-ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-# Next.js 빌드 프로세스가 이 변수들을 인식하도록 환경 변수로 설정합니다.
-ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
-ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
 ENV NEXT_TELEMETRY_DISABLED 1
 
 RUN npm run build
@@ -46,10 +39,7 @@ RUN chown nextjs:nodejs .next
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-# 실행 시점에도 환경 변수가 필요할 수 있으니 한 번 더 선언합니다.
-ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
-ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
-
+# 실행 시점의 환경 변수는 허깅페이스 Secrets를 통해 자동으로 주입됩니다.
 USER nextjs
 
 EXPOSE 7860
