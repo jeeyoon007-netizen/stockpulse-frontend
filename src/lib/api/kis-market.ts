@@ -54,28 +54,36 @@ export async function fetchMajorIndex(code: string, label: string): Promise<Inde
     appkey: appKey,
     appsecret: appSecret,
     tr_id: "FHPST01710000",
+    custtype: "P", // 개인 고객 명시
   };
 
   try {
     const res = await fetch(url, { headers, cache: "no-store" });
-    if (!res.ok) return null;
+    if (!res.ok) {
+        console.error(`fetchMajorIndex(${label}) HTTP Error: ${res.status}`);
+        return null;
+    }
 
     const data = await res.json();
-    if (data.rt_cd !== "0" || !data.output) return null;
+    if (data.rt_cd !== "0" || !data.output) {
+        console.error(`fetchMajorIndex(${label}) KIS Error: ${data.rt_cd} - ${data.msg1}`);
+        return null;
+    }
 
     const out = data.output;
-    const prdy_vrss = Number(out.prdy_vrss); // 전일 대비
+    const prpr = Number(out.bstp_nmix_prpr || 0);
+    const prdy_vrss = Number(out.prdy_vrss || 0); // 전일 대비
     const direction: "up" | "down" | "flat" = prdy_vrss > 0 ? "up" : prdy_vrss < 0 ? "down" : "flat";
 
     return {
       label,
-      value: Number(out.bstp_nmix_prpr).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+      value: prpr.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
       change: (prdy_vrss > 0 ? "+" : "") + prdy_vrss.toFixed(2),
-      changePercent: (prdy_vrss > 0 ? "+" : "") + out.bstp_nmix_prdy_ctrt + "%",
+      changePercent: (prdy_vrss > 0 ? "+" : "") + (out.bstp_nmix_prdy_ctrt || "0.00") + "%",
       direction
     };
   } catch (error) {
-    console.error(`fetchMajorIndex(${code}) error:`, error);
+    console.error(`fetchMajorIndex(${code}) exception:`, error);
     return null;
   }
 }
@@ -89,7 +97,6 @@ export async function fetchExchangeRate(): Promise<IndexPriceData | null> {
   const appKey = process.env.KIS_APP_KEY!;
   const appSecret = process.env.KIS_APP_SECRET!;
 
-  // FID_INPUT_ISCD=FX@KRW (원/달러)
   const url = `${KIS_BASE_URL}/uapi/domestic-stock/v1/quotations/inquire-daily-indexprice?FID_COND_MRKT_DIV_CODE=X&FID_INPUT_ISCD=FX@KRW&FID_PERIOD_DIV_CODE=D`;
 
   const headers = {
@@ -98,28 +105,36 @@ export async function fetchExchangeRate(): Promise<IndexPriceData | null> {
     appkey: appKey,
     appsecret: appSecret,
     tr_id: "FHPST04010100",
+    custtype: "P",
   };
 
   try {
     const res = await fetch(url, { headers, cache: "no-store" });
-    if (!res.ok) return null;
+    if (!res.ok) {
+        console.error("fetchExchangeRate HTTP Error:", res.status);
+        return null;
+    }
 
     const data = await res.json();
-    if (data.rt_cd !== "0" || !data.output1) return null;
+    if (data.rt_cd !== "0" || !data.output1) {
+        console.error(`fetchExchangeRate KIS Error: ${data.rt_cd} - ${data.msg1}`);
+        return null;
+    }
 
     const out = data.output1;
-    const prdy_vrss = Number(out.prdy_vrss);
+    const prpr = Number(out.ovrs_nmix_prpr || 0);
+    const prdy_vrss = Number(out.prdy_vrss || 0);
     const direction: "up" | "down" | "flat" = prdy_vrss > 0 ? "up" : prdy_vrss < 0 ? "down" : "flat";
 
     return {
       label: "원/달러",
-      value: Number(out.ovrs_nmix_prpr).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+      value: prpr.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
       change: (prdy_vrss > 0 ? "+" : "") + prdy_vrss.toFixed(2),
-      changePercent: (prdy_vrss > 0 ? "+" : "") + out.ovrs_nmix_prdy_ctrt + "%",
+      changePercent: (prdy_vrss > 0 ? "+" : "") + (out.ovrs_nmix_prdy_ctrt || "0.00") + "%",
       direction
     };
   } catch (error) {
-    console.error("fetchExchangeRate error:", error);
+    console.error("fetchExchangeRate exception:", error);
     return null;
   }
 }

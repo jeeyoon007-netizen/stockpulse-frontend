@@ -36,10 +36,21 @@ export async function fetchMarketOverviewAction(): Promise<IndexPriceData[]> {
       fetchExchangeRate(),
     ]);
 
-    // null 필터링 (에러 시 더미 혹은 빈 값 방어)
-    return results.filter((r): r is IndexPriceData => r !== null);
+    const activeResults = results.filter((r): r is IndexPriceData => r !== null);
+    
+    if (activeResults.length === 0) {
+        console.warn("모든 시장 지수 API 호출에 실패했습니다. 환경 변수(KIS_APP_KEY 등)를 확인해주세요.");
+        // 화면이 무한 로딩(깜빡임)에 빠지지 않도록 '점검 중' 상태 반환
+        return [
+          { label: "코스피", value: "데이터 없음", change: "0.00", changePercent: "0.00%", direction: "flat" },
+          { label: "코스닥", value: "데이터 없음", change: "0.00", changePercent: "0.00%", direction: "flat" },
+          { label: "코스피200", value: "데이터 없음", change: "0.00", changePercent: "0.00%", direction: "flat" },
+          { label: "원/달러", value: "데이터 없음", change: "0.00", changePercent: "0.00%", direction: "flat" },
+        ];
+    }
+    return activeResults;
   } catch (error) {
-    console.error("fetchMarketOverviewAction error:", error);
+    console.error("fetchMarketOverviewAction exception:", error);
     return [];
   }
 }
