@@ -56,6 +56,14 @@ export function TradingViewChart({ data }: TradingViewChartProps) {
       rightPriceScale: {
         borderColor: "rgba(255, 255, 255, 0.1)",
       },
+      handleScale: {
+        mouseWheel: false, // 마우스 휠로 차트 확대/축소 비활성화 (페이지 스크롤 방해 방지)
+        pinch: true,
+      },
+      handleScroll: {
+        mouseWheel: true,   // 마우스 휠로 차트 이동은 허용 (옵션에 따라 다름, 보통 줌이 꺼지면 스크롤로 동작)
+        pressedMouseMove: true,
+      },
     });
 
     const candleSeries = chart.addCandlestickSeries({

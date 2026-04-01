@@ -68,7 +68,9 @@ export default function DashboardPage() {
     adr: "0", 
     adrSignal: "대기 중", 
     advanceCount: 0, 
-    declineCount: 0 
+    declineCount: 0,
+    newHighCount: 0,
+    highTrend: []
   });
 
   useEffect(() => {

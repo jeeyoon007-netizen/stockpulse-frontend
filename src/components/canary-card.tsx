@@ -12,15 +12,16 @@ interface Props {
     adrSignal: string;
     advanceCount: number;
     declineCount: number;
+    newHighCount?: number;
+    highTrend?: { date: string, count: number }[];
   };
 }
 
 export function CanaryCard({ data }: Props) {
-  const { funds, creditHistory, adr, adrSignal, advanceCount, declineCount } = data;
+  const { funds, creditHistory, adr, adrSignal, advanceCount, declineCount, newHighCount = 0, highTrend = [] } = data;
   
   // Format Large Money (KRW 억/조)
   const formatMoney = (val: number) => {
-    // KIS mktfunds는 보통 억원 단위
     if (val >= 10000) { 
         const jo = Math.floor(val / 10000);
         const eok = val % 10000;
@@ -58,20 +59,38 @@ export function CanaryCard({ data }: Props) {
       </div>
 
       <div className="space-y-4">
-        {/* Deposit */}
-        <div className="p-3 bg-muted/20 rounded-lg relative overflow-hidden group">
-          <div className="flex items-center gap-3 mb-1">
-            <div className="p-2 bg-chart-1/10 rounded-md">
-                <Wallet className="w-4 h-4 text-chart-1" />
+        <div className="grid grid-cols-2 gap-3">
+            {/* Deposit */}
+            <div className="p-3 bg-muted/20 rounded-lg relative overflow-hidden group">
+              <div className="flex items-center gap-3 mb-1">
+                <div className="p-2 bg-chart-1/10 rounded-md">
+                    <Wallet className="w-4 h-4 text-chart-1" />
+                </div>
+                <span className="text-[10px] text-muted-foreground">고객예탁금</span>
+              </div>
+              <div className="flex items-baseline gap-1">
+                <span className="text-lg font-black tracking-tighter">
+                    {funds ? formatMoney(funds.deposit) : "---"}
+                </span>
+                <span className="text-[8px] font-bold text-muted-foreground">원</span>
+              </div>
             </div>
-            <span className="text-xs text-muted-foreground">고객예탁금 (대기자금)</span>
-          </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-xl font-black tracking-tighter">
-                {funds ? formatMoney(funds.deposit) : "---"}
-            </span>
-            <span className="text-[10px] font-bold text-muted-foreground">원</span>
-          </div>
+
+            {/* New Highs */}
+            <div className="p-3 bg-muted/20 rounded-lg relative overflow-hidden group border-l-2 border-stock-up/30">
+              <div className="flex items-center gap-3 mb-1">
+                <div className="p-2 bg-stock-up/10 rounded-md">
+                    <TrendingUp className="w-4 h-4 text-stock-up" />
+                </div>
+                <span className="text-[10px] text-muted-foreground">52주 신고가</span>
+              </div>
+              <div className="flex items-baseline gap-1">
+                <span className="text-lg font-black tracking-tighter text-stock-up">
+                    {newHighCount}
+                </span>
+                <span className="text-[8px] font-bold text-muted-foreground">종목</span>
+              </div>
+            </div>
         </div>
 
         {/* Credit Balance */}
@@ -108,7 +127,7 @@ export function CanaryCard({ data }: Props) {
           </div>
           <div className="flex flex-col gap-1">
             <div className="flex items-baseline gap-2">
-                <span className="text-xl font-black tracking-tighter">{adr}%</span>
+                <span className="text-xl font-black tracking-tighter">{Number(adr).toFixed(1)}%</span>
                 <span className={`text-[10px] font-bold ${getSignalColor(adrSignal)}`}>
                     {adrSignal}
                 </span>
@@ -120,21 +139,24 @@ export function CanaryCard({ data }: Props) {
           </div>
         </div>
 
-        {/* Mini Chart Area (Placeholder for trend view) */}
-        <div className="flex items-end justify-between gap-1 h-10 px-1 pt-2">
-            {creditHistory.slice(-12).map((h, i) => {
-                const max = Math.max(...creditHistory.map(x => x.amount));
-                const min = Math.min(...creditHistory.map(x => x.amount));
-                const height = ((h.amount - min) / (max - min || 1)) * 100;
-                return (
-                    <div 
-                        key={i} 
-                        className="bg-chart-3/30 w-full rounded-t-[2px] hover:bg-chart-3 transition-all" 
-                        style={{ height: `${Math.max(15, height)}%` }}
-                        title={`${h.date}: ${h.amount}`}
-                    ></div>
-                );
-            })}
+        {/* New High Trend Mini Chart */}
+        <div className="pt-2">
+            <span className="text-[9px] text-muted-foreground font-bold mb-2 block uppercase tracking-wider">신고가 5일 추이</span>
+            <div className="flex items-end justify-between gap-2 h-12 px-1">
+                {highTrend.map((h, i) => {
+                    const max = Math.max(...highTrend.map(x => x.count), 1);
+                    const height = (h.count / max) * 100;
+                    return (
+                        <div key={i} className="flex flex-col items-center flex-1 gap-1 group">
+                            <div 
+                                className={`w-full rounded-t-sm transition-all duration-300 ${i === highTrend.length - 1 ? 'bg-stock-up shadow-[0_0_8px_rgba(239,68,68,0.4)]' : 'bg-stock-up/30 group-hover:bg-stock-up/50'}`} 
+                                style={{ height: `${Math.max(10, height)}%` }}
+                            ></div>
+                            <span className="text-[7px] text-muted-foreground font-mono">{h.date}</span>
+                        </div>
+                    );
+                })}
+            </div>
         </div>
       </div>
     </div>

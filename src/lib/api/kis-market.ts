@@ -305,3 +305,81 @@ export async function fetchInvestorRanking(type: '1' | '2', market = '0001'): Pr
     return [];
   }
 }
+
+/**
+ * 당일 52주 신고가 종목 수를 가져옵니다.
+ * TR_ID: FHKST01010700 (국내주식 신고가/신저가)
+ */
+export async function fetchNewHighCount(): Promise<number> {
+  const token = await getAccessToken();
+  const appKey = process.env.KIS_APP_KEY!;
+  const appSecret = process.env.KIS_APP_SECRET!;
+
+  const fetchMarketHigh = async (market: 'J' | 'W') => {
+    // psearch-high-low 엔드포인트 사용
+    const url = `${KIS_BASE_URL}/uapi/domestic-stock/v1/quotations/psearch-high-low?FID_COND_MRKT_DIV_CODE=${market}&FID_INPUT_ISCD=0000&FID_DIV_CLS_CODE=0&FID_RANK_SORT_CLS_CODE=0&FID_ETC_CLS_CODE=0`;
+    
+    const headers = {
+      "Content-Type": "application/json",
+      authorization: `Bearer ${token}`,
+      appkey: appKey,
+      appsecret: appSecret,
+      tr_id: "FHKST01010700",
+      custtype: "P",
+    };
+
+    try {
+      const res = await fetch(url, { headers, cache: "no-store" });
+      if (!res.ok) return 0;
+      const data = await res.json();
+      if (data.rt_cd !== "0" || !data.output) return 0;
+      return Array.isArray(data.output) ? data.output.length : 0;
+    } catch {
+      return 0;
+    }
+  };
+
+  const [kospiCount, kosdaqCount] = await Promise.all([
+    fetchMarketHigh('J'),
+    fetchMarketHigh('W')
+  ]);
+
+  return kospiCount + kosdaqCount;
+}
+
+/**
+ * 특정 종목의 상세 정보(시가총액, 업종 등)를 가져옵니다.
+ * TR_ID: FHKST01010100 (주식현재가 시세)
+ */
+export async function fetchStockDetail(code: string) {
+  const token = await getAccessToken();
+  const appKey = process.env.KIS_APP_KEY!;
+  const appSecret = process.env.KIS_APP_SECRET!;
+
+  const url = `${KIS_BASE_URL}/uapi/domestic-stock/v1/quotations/inquire-price?FID_COND_MRKT_DIV_CODE=J&FID_INPUT_ISCD=${code}`;
+  
+  const headers = {
+    "Content-Type": "application/json",
+    authorization: `Bearer ${token}`,
+    appkey: appKey,
+    appsecret: appSecret,
+    tr_id: "FHKST01010100",
+    custtype: "P",
+  };
+
+  try {
+    const res = await fetch(url, { headers, cache: "no-store" });
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data.rt_cd !== "0" || !data.output) return null;
+    
+    return {
+      name: data.output.hts_kor_isnm,
+      industry: data.output.bstp_kor_isnm,
+      marketCap: Number(data.output.hts_avls || 0), // 시가총액 (억 단위)
+      currentPrice: Number(data.output.stck_prpr || 0),
+    };
+  } catch {
+    return null;
+  }
+}
