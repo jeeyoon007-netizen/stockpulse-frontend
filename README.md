@@ -5,7 +5,10 @@ colorFrom: blue
 colorTo: indigo
 sdk: docker
 pinned: false
-app_port: 3000
+app_port: 7860
+build_args:
+  - NEXT_PUBLIC_SUPABASE_URL
+  - NEXT_PUBLIC_SUPABASE_ANON_KEY
 ---
 
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
