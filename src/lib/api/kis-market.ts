@@ -55,7 +55,7 @@ export async function fetchMajorIndex(code: string, label: string): Promise<Inde
     authorization: `Bearer ${token}`,
     appkey: appKey,
     appsecret: appSecret,
-    tr_id: "FHPST01710000",
+    tr_id: "FHPUP02100000",
     custtype: "P",
   };
 
@@ -73,7 +73,7 @@ export async function fetchMajorIndex(code: string, label: string): Promise<Inde
 
     const out = data.output;
     const prpr = Number(out.bstp_nmix_prpr || 0);
-    const prdy_vrss = Number(out.prdy_vrss || 0);
+    const prdy_vrss = Number(out.bstp_nmix_prdy_vrss || 0);
     const direction: "up" | "down" | "flat" = prdy_vrss > 0 ? "up" : prdy_vrss < 0 ? "down" : "flat";
 
     return {
@@ -122,7 +122,7 @@ async function fetchMajorIndexLatest(code: string, label: string): Promise<Index
 
     const out = data.output1[0]; // 최신 영업일
     const prpr = Number(out.bstp_nmix_prpr || 0);
-    const prdy_vrss = Number(out.prdy_vrss || 0);
+    const prdy_vrss = Number(out.bstp_nmix_prdy_vrss || 0);
     const direction: "up" | "down" | "flat" = prdy_vrss > 0 ? "up" : prdy_vrss < 0 ? "down" : "flat";
 
     return {
@@ -145,14 +145,21 @@ export async function fetchExchangeRate(): Promise<IndexPriceData | null> {
   const appKey = process.env.KIS_APP_KEY!;
   const appSecret = process.env.KIS_APP_SECRET!;
 
-  const url = `${KIS_BASE_URL}/uapi/domestic-stock/v1/quotations/inquire-daily-indexprice?FID_COND_MRKT_DIV_CODE=X&FID_INPUT_ISCD=FX@KRW&FID_PERIOD_DIV_CODE=D`;
+  const today = new Date();
+  const past = new Date();
+  past.setDate(today.getDate() - 7);
+  const startStr = formatYYYYMMDD(past);
+  const endStr = formatYYYYMMDD(today);
+
+  // 해외 지표 기간별 시세 (환율용)
+  const url = `${KIS_BASE_URL}/uapi/overseas-price/v1/quotations/inquire-daily-chartprice?FID_COND_MRKT_DIV_CODE=X&FID_INPUT_ISCD=FX@KWS&FID_INPUT_DATE_1=${startStr}&FID_INPUT_DATE_2=${endStr}&FID_PERIOD_DIV_CODE=D`;
 
   const headers = {
     "Content-Type": "application/json",
     authorization: `Bearer ${token}`,
     appkey: appKey,
     appsecret: appSecret,
-    tr_id: "FHPST04010100",
+    tr_id: "FHKST03030100", // 해외지표 기간별 시세
     custtype: "P",
   };
 
@@ -161,21 +168,21 @@ export async function fetchExchangeRate(): Promise<IndexPriceData | null> {
     if (!res.ok) return null;
 
     const data = await res.json();
-    if (data.rt_cd !== "0" || !data.output1) {
+    if (data.rt_cd !== "0" || !data.output1 || !data.output1[0]) {
       console.error(`fetchExchangeRate KIS 에러: [${data.rt_cd}] ${data.msg1}`);
       return null;
     }
 
     const out = Array.isArray(data.output1) ? data.output1[0] : data.output1;
     const prpr = Number(out.ovrs_nmix_prpr || 0);
-    const prdy_vrss = Number(out.prdy_vrss || 0);
+    const prdy_vrss = Number(out.ovrs_nmix_prdy_vrss || 0);
     const direction: "up" | "down" | "flat" = prdy_vrss > 0 ? "up" : prdy_vrss < 0 ? "down" : "flat";
 
     return {
       label: "원/달러",
       value: prpr.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
       change: (prdy_vrss > 0 ? "+" : "") + prdy_vrss.toFixed(2),
-      changePercent: (prdy_vrss > 0 ? "+" : "") + (out.ovrs_nmix_prdy_ctrt || "0.00") + "%",
+      changePercent: (prdy_vrss > 0 ? "+" : "") + (out.prdy_ctrt || "0.00") + "%",
       direction
     };
   } catch (error) {
@@ -318,7 +325,7 @@ export async function fetchNewHighCount(): Promise<number> {
   const fetchMarketHigh = async (market: 'J' | 'W') => {
     // psearch-high-low 엔드포인트 사용
     const url = `${KIS_BASE_URL}/uapi/domestic-stock/v1/quotations/psearch-high-low?FID_COND_MRKT_DIV_CODE=${market}&FID_INPUT_ISCD=0000&FID_DIV_CLS_CODE=0&FID_RANK_SORT_CLS_CODE=0&FID_ETC_CLS_CODE=0`;
-    
+
     const headers = {
       "Content-Type": "application/json",
       authorization: `Bearer ${token}`,
@@ -357,7 +364,7 @@ export async function fetchStockDetail(code: string) {
   const appSecret = process.env.KIS_APP_SECRET!;
 
   const url = `${KIS_BASE_URL}/uapi/domestic-stock/v1/quotations/inquire-price?FID_COND_MRKT_DIV_CODE=J&FID_INPUT_ISCD=${code}`;
-  
+
   const headers = {
     "Content-Type": "application/json",
     authorization: `Bearer ${token}`,
@@ -372,7 +379,7 @@ export async function fetchStockDetail(code: string) {
     if (!res.ok) return null;
     const data = await res.json();
     if (data.rt_cd !== "0" || !data.output) return null;
-    
+
     return {
       name: data.output.hts_kor_isnm,
       industry: data.output.bstp_kor_isnm,
