@@ -5,6 +5,8 @@ import { runAnalysisEngine, type AIAnalysisResult } from "@/lib/analysis/engine"
 import { supabase } from "@/lib/supabase";
 
 import { fetchFearGreedIndex, type FearGreedResponse } from "@/lib/api/feargreed";
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 import { 
   fetchMarketFunds, 
   fetchDailyCreditBalance, 
@@ -12,12 +14,31 @@ import {
   fetchMajorIndex,
   fetchExchangeRate,
   fetchNewHighCount,
-  fetchStockDetail, // [신규 추가]
+  fetchStockDetail,
   type MarketFundsData, 
   type CreditBalanceData, 
   type InvestorFlowData,
   type IndexPriceData
 } from "@/lib/api/kis-market";
+
+/**
+ * 전역 캐시 설정 (서버 메모리에 상주)
+ * 사용자 요청: 분당 1회 제한을 고려하여 1분 10초(70,000ms) TTL 적용
+ */
+const CACHE_TTL = 70 * 1000;
+const GLOBAL_CACHE: Record<string, { data: any, timestamp: number }> = {};
+
+function getCachedData(key: string) {
+    const cached = GLOBAL_CACHE[key];
+    if (cached && (Date.now() - cached.timestamp < CACHE_TTL)) {
+        return cached.data;
+    }
+    return null;
+}
+
+function setCachedData(key: string, data: any) {
+    GLOBAL_CACHE[key] = { data, timestamp: Date.now() };
+}
 
 // ... (existing action)
 
@@ -25,6 +46,10 @@ import {
  * 수급 상황 및 특징 분석 서버 액션
  */
 export async function fetchInvestorFlowAnalysisAction(market = '0001') {
+    const cacheKey = `investor_flow_${market}`;
+    const cached = getCachedData(cacheKey);
+    if (cached) return cached;
+
     try {
         const [foreign, institutional] = await Promise.all([
             fetchInvestorRanking('1', market),
@@ -34,57 +59,55 @@ export async function fetchInvestorFlowAnalysisAction(market = '0001') {
         const foreignTop10 = foreign.slice(0, 10);
         const instTop10 = institutional.slice(0, 10);
 
-        // 상위 20개 종목(중복 제외)에 대한 상세 정보(산업군, 시총) 가져오기
         const uniqueCodes = Array.from(new Set([
             ...foreignTop10.map(s => s.code),
             ...instTop10.map(s => s.code)
         ]));
 
-        const details = await Promise.all(uniqueCodes.map(code => fetchStockDetail(code)));
+        // [순차 처리] KIS API TPS 제한을 피하기 위해 0.2초 간격으로 순차 요청
         const detailMap = new Map();
-        details.forEach((d, i) => {
-            if (d) detailMap.set(uniqueCodes[i], d);
-        });
+        for (const code of uniqueCodes) {
+            const d = await fetchStockDetail(code);
+            if (d) detailMap.set(code, d);
+            await delay(200); 
+        }
 
-        // 1. 동시 순매수 종목
         const overlap = foreignTop10.filter(f => instTop10.some(i => i.code === f.code)).map(s => s.name);
 
-        // 2. 주도 산업군 (Top 10 전체 대상)
         const industryCount: Record<string, number> = {};
         detailMap.forEach(d => {
-            industryCount[d.industry] = (industryCount[d.industry] || 0) + 1;
+            if (d.industry) {
+                industryCount[d.industry] = (industryCount[d.industry] || 0) + 1;
+            }
         });
         const dominantIndustries = Object.entries(industryCount)
             .sort((a, b) => b[1] - a[1])
             .slice(0, 2)
             .map(([name]) => name);
 
-        // 3. 고회전 종목 (시총 대비 거래대금이 5% 이상인 과열 종목)
-        // KIS amount/avls 모두 백만원 단위
         const highTurnover = Array.from(detailMap.entries())
             .filter(([code, detail]) => {
                 const stock = [...foreignTop10, ...instTop10].find(s => s.code === code);
                 if (!stock || detail.marketCap === 0) return false;
                 const turnover = (stock.amount / detail.marketCap) * 100;
-                return turnover > 3; // 3% 이상일 때 고회전으로 간주
+                return turnover > 3; 
             })
             .map(([_, d]) => d.name);
 
-        return {
+        const result = {
             foreignTop10,
             instTop10,
             overlap,
             dominantIndustries,
             highTurnover: highTurnover.slice(0, 3)
         };
+
+        setCachedData(cacheKey, result);
+        return result;
     } catch (error) {
         console.error("fetchInvestorFlowAnalysisAction error:", error);
         return {
-            foreignTop10: [],
-            instTop10: [],
-            overlap: [],
-            dominantIndustries: [],
-            highTurnover: []
+            foreignTop10: [], instTop10: [], overlap: [], dominantIndustries: [], highTurnover: []
         };
     }
 }
@@ -100,6 +123,9 @@ export interface StockAnalysisResponse {
  * [마켓 오버뷰] 상단 지수 4종 서버 액션
  */
 export async function fetchMarketOverviewAction(): Promise<IndexPriceData[]> {
+  const cached = getCachedData('market_overview');
+  if (cached) return cached;
+
   try {
     const results = await Promise.all([
       fetchMajorIndex("0001", "코스피"),
@@ -111,8 +137,7 @@ export async function fetchMarketOverviewAction(): Promise<IndexPriceData[]> {
     const activeResults = results.filter((r): r is IndexPriceData => r !== null);
     
     if (activeResults.length === 0) {
-        console.warn("모든 시장 지수 API 호출에 실패했습니다. 환경 변수(KIS_APP_KEY 등)를 확인해주세요.");
-        // 화면이 무한 로딩(깜빡임)에 빠지지 않도록 '점검 중' 상태 반환
+        console.warn("모든 시장 지수 API 호출에 실패했습니다.");
         return [
           { label: "코스피", value: "데이터 없음", change: "0.00", changePercent: "0.00%", direction: "flat" },
           { label: "코스닥", value: "데이터 없음", change: "0.00", changePercent: "0.00%", direction: "flat" },
@@ -120,6 +145,8 @@ export async function fetchMarketOverviewAction(): Promise<IndexPriceData[]> {
           { label: "원/달러", value: "데이터 없음", change: "0.00", changePercent: "0.00%", direction: "flat" },
         ];
     }
+    
+    setCachedData('market_overview', activeResults);
     return activeResults;
   } catch (error) {
     console.error("fetchMarketOverviewAction exception:", error);
@@ -182,6 +209,9 @@ export async function fetchFearGreedAction(): Promise<FearGreedResponse | null> 
  * [카나리아] 시장 자금, 신용잔고, ADR 및 신고가 서버 액션
  */
 export async function fetchCanaryDataAction() {
+  const cached = getCachedData('canary_data');
+  if (cached) return cached;
+
   try {
     const [funds, creditHistory, kospiInfo, newHighCount] = await Promise.all([
       fetchMarketFunds(),
@@ -190,7 +220,6 @@ export async function fetchCanaryDataAction() {
       fetchNewHighCount()
     ]);
 
-    // ADR 계산 (상승 종목 수 / 하락 종목 수)
     let adr = 0;
     let adrSignal = "데이터 부족";
     
@@ -204,7 +233,6 @@ export async function fetchCanaryDataAction() {
         else adrSignal = "중립";
     }
 
-    // 신고가 5일 추이 (실제 DB가 없으므로 현재는 현재값 기반 모의 데이터 생성)
     const highTrend = [
         { date: '4일전', count: Math.floor(newHighCount * 0.8) },
         { date: '3일전', count: Math.floor(newHighCount * 1.1) },
@@ -213,7 +241,7 @@ export async function fetchCanaryDataAction() {
         { date: '오늘', count: newHighCount },
     ];
 
-    return { 
+    const result = { 
         funds, 
         creditHistory, 
         adr: adr.toFixed(1), 
@@ -223,17 +251,17 @@ export async function fetchCanaryDataAction() {
         newHighCount,
         highTrend
     };
+
+    // 데이터가 정상적으로 수집된 경우에만 캐시 (고객예탁금 정보가 있을 때)
+    if (funds) {
+        setCachedData('canary_data', result);
+    }
+    return result;
   } catch (error) {
     console.error("fetchCanaryDataAction error:", error);
     return { 
-        funds: null, 
-        creditHistory: [], 
-        adr: "0", 
-        adrSignal: "오류",
-        advanceCount: 0,
-        declineCount: 0,
-        newHighCount: 0,
-        highTrend: []
+        funds: null, creditHistory: [], adr: "0", adrSignal: "오류",
+        advanceCount: 0, declineCount: 0, newHighCount: 0, highTrend: []
     };
   }
 }

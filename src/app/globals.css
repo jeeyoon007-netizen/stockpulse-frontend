@@ -85,8 +85,8 @@
   --sidebar-accent-foreground: oklch(0.95 0.01 260);
   --sidebar-border: oklch(0.24 0.01 260);
   --sidebar-ring: oklch(0.6 0.15 250);
-  --stock-up: oklch(0.72 0.2 155);
-  --stock-down: oklch(0.65 0.22 25);
+  --stock-up: oklch(0.65 0.22 25);     /* Red for UP in KR market */
+  --stock-down: oklch(0.6 0.15 250);   /* Blue for DOWN in KR market */
   --stock-flat: oklch(0.65 0.02 260);
 }
 
@@ -124,8 +124,8 @@
   --sidebar-accent-foreground: oklch(0.95 0.01 260);
   --sidebar-border: oklch(0.24 0.01 260);
   --sidebar-ring: oklch(0.6 0.15 250);
-  --stock-up: oklch(0.72 0.2 155);
-  --stock-down: oklch(0.65 0.22 25);
+  --stock-up: oklch(0.65 0.22 25);
+  --stock-down: oklch(0.6 0.15 250);
   --stock-flat: oklch(0.65 0.02 260);
 }
 

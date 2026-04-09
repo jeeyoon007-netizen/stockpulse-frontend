@@ -5,6 +5,7 @@ export const KIS_BASE_URL = "https://openapi.koreainvestment.com:9443";
 // 서버 전용 인메모리 캐싱 (개발 환경 핫 리로드 시 초기화될 수 있음)
 let cachedToken = "";
 let tokenExpiry = 0;
+let tokenPromise: Promise<string> | null = null; // 동시 요청 방지
 
 export class AnalysisError extends Error {
   constructor(message: string) {
@@ -22,37 +23,54 @@ export async function getAccessToken() {
     return cachedToken;
   }
 
-  const appKey = process.env.KIS_APP_KEY;
-  const appSecret = process.env.KIS_APP_SECRET;
-
-  if (!appKey || !appSecret) {
-    throw new Error("환경변수에 KIS_APP_KEY 또는 KIS_APP_SECRET이 설정되지 않았습니다.");
+  // 발급이 진행 중이면, 진행 중인 Promise를 같이 기다림 (중복 호출 방지)
+  if (tokenPromise) {
+    return tokenPromise;
   }
 
-  const res = await fetch(`${KIS_BASE_URL}/oauth2/tokenP`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      grant_type: "client_credentials",
-      appkey: appKey,
-      appsecret: appSecret,
-    }),
-    cache: "no-store",
-  });
+  tokenPromise = (async () => {
+    try {
+      const appKey = process.env.KIS_APP_KEY;
+      const appSecret = process.env.KIS_APP_SECRET;
 
-  if (!res.ok) {
-    const errorBody = await res.text();
-    throw new Error(`토큰 발급 실패: ${res.status} ${errorBody}`);
-  }
+      if (!appKey || !appSecret) {
+        throw new Error("환경변수에 KIS_APP_KEY 또는 KIS_APP_SECRET이 설정되지 않았습니다.");
+      }
 
-  const data = await res.json();
-  cachedToken = data.access_token;
-  // 토큰 유효기간(expires_in)은 보통 86400초, 여유 시간 1시간(3600*1000) 빼고 설정
-  tokenExpiry = now + data.expires_in * 1000 - 3600000;
+      const res = await fetch(`${KIS_BASE_URL}/oauth2/tokenP`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          grant_type: "client_credentials",
+          appkey: appKey,
+          appsecret: appSecret,
+        }),
+        cache: "no-store",
+        // @ts-ignore - Next.js/Node fetch supports signal
+        signal: AbortSignal.timeout(10000)
+      });
 
-  return cachedToken;
+      if (!res.ok) {
+        const errorBody = await res.text();
+        console.error(`[KIS AUTH ERROR] 토큰 발급 실패: ${res.status} | 원문: ${errorBody}`);
+        throw new Error(`토큰 발급 실패: ${res.status} ${errorBody}`);
+      }
+
+      const data = await res.json();
+      cachedToken = data.access_token;
+      // 토큰 유효기간(expires_in)은 보통 86400초, 여유 시간 1시간(3600*1000) 빼고 설정
+      tokenExpiry = now + data.expires_in * 1000 - 3600000;
+
+      return cachedToken;
+    } finally {
+      // 처리가 완료(성공 혹은 실패)되면 잠금 해제
+      tokenPromise = null;
+    }
+  })();
+
+  return tokenPromise;
 }
 
 export interface OHLCV {

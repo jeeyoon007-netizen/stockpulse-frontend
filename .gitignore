@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local diagnostic files
+market_info.py
+scratch/
+src/diagnostic-exchange-v2.ts
+src/test-market-local.ts

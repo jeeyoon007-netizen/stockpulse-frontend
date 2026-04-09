@@ -1,5 +1,23 @@
-import "server-only";
 import { getAccessToken, KIS_BASE_URL, formatYYYYMMDD } from "./kis";
+
+/**
+ * 전역 유틸리티: 타임아웃이 포함된 fetch
+ */
+async function fetchWithTimeout(url: string, options: RequestInit, timeout = 5000) {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeout);
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal
+    });
+    clearTimeout(id);
+    return response;
+  } catch (err) {
+    clearTimeout(id);
+    throw err;
+  }
+}
 
 // --- [Interfaces] ---
 
@@ -60,14 +78,16 @@ export async function fetchMajorIndex(code: string, label: string): Promise<Inde
   };
 
   try {
-    const res = await fetch(url, { headers, cache: "no-store" });
-    if (!res.ok) return null;
+    const res = await fetchWithTimeout(url, { headers, cache: "no-store" });
+    if (!res.ok) {
+        console.error(`fetchMajorIndex(${label}) HTTP 에러: ${res.status}`);
+        return null;
+    }
 
     const data = await res.json();
 
-    // 만약 현재가 데이터가 없거나 에러면 (장 종료 등), 일별 시세에서 최신값 가져오기 시도
     if (data.rt_cd !== "0" || !data.output) {
-      console.warn(`fetchMajorIndex(${label}) KIS 에러: [${data.rt_cd}] ${data.msg1}. 일별 시세로 전환합니다.`);
+      console.warn(`fetchMajorIndex(${label}) KIS 응답 에러: [${data.rt_cd}] ${data.msg1}. 일별 시세 전환.`);
       return fetchMajorIndexLatest(code, label);
     }
 
@@ -139,92 +159,99 @@ async function fetchMajorIndexLatest(code: string, label: string): Promise<Index
 
 /**
  * 주요 환율 정보를 가져옵니다. (원/달러)
+ * 한국은행 ECOS Open API를 사용하도록 변경됨
  */
 export async function fetchExchangeRate(): Promise<IndexPriceData | null> {
-  const token = await getAccessToken();
-  const appKey = process.env.KIS_APP_KEY!;
-  const appSecret = process.env.KIS_APP_SECRET!;
-
+  const BOK_API_KEY = process.env.BOK_API_KEY || "D7Z1MD14MIETKMYQBYYB";
+  
   const today = new Date();
   const past = new Date();
-  past.setDate(today.getDate() - 7);
+  past.setDate(today.getDate() - 14); // 주말, 휴일 감안하여 14일 전부터 조회
+  
   const startStr = formatYYYYMMDD(past);
   const endStr = formatYYYYMMDD(today);
 
-  // 해외 지표 기간별 시세 (환율용)
-  const url = `${KIS_BASE_URL}/uapi/overseas-price/v1/quotations/inquire-daily-chartprice?FID_COND_MRKT_DIV_CODE=X&FID_INPUT_ISCD=FX@KWS&FID_INPUT_DATE_1=${startStr}&FID_INPUT_DATE_2=${endStr}&FID_PERIOD_DIV_CODE=D`;
-
-  const headers = {
-    "Content-Type": "application/json",
-    authorization: `Bearer ${token}`,
-    appkey: appKey,
-    appsecret: appSecret,
-    tr_id: "FHKST03030100", // 해외지표 기간별 시세
-    custtype: "P",
-  };
+  // 한국은행 ECOS 연계: 731Y001 (주요국 통화의 대원화환율), 0000001 (원/미국달러 매매기준율)
+  const url = `http://ecos.bok.or.kr/api/StatisticSearch/${BOK_API_KEY}/json/kr/1/10/731Y001/D/${startStr}/${endStr}/0000001`;
 
   try {
-    const res = await fetch(url, { headers, cache: "no-store" });
+    const res = await fetchWithTimeout(url, { cache: "no-store" }, 7000);
     if (!res.ok) return null;
 
     const data = await res.json();
-    if (data.rt_cd !== "0" || !data.output1 || !data.output1[0]) {
-      console.error(`fetchExchangeRate KIS 에러: [${data.rt_cd}] ${data.msg1}`);
+    
+    if (!data.StatisticSearch || !data.StatisticSearch.row || data.StatisticSearch.row.length < 2) {
+      console.error(`fetchExchangeRate 한국은행 API 에러: 데이터 부족`);
       return null;
     }
 
-    const out = Array.isArray(data.output1) ? data.output1[0] : data.output1;
-    const prpr = Number(out.ovrs_nmix_prpr || 0);
-    const prdy_vrss = Number(out.ovrs_nmix_prdy_vrss || 0);
+    const rows = data.StatisticSearch.row;
+    // BOK ECOS API는 보통 날짜 오름차순으로 제공. 마지막 원소가 가장 최신 영업일.
+    const latest = rows[rows.length - 1];
+    const previous = rows[rows.length - 2];
+
+    const prpr = Number(latest.DATA_VALUE || 0);
+    const prevPrpr = Number(previous.DATA_VALUE || 0);
+    
+    // 전일 대비 증감 및 등락률 계산
+    const prdy_vrss = Number((prpr - prevPrpr).toFixed(2));
+    const prdy_ctrt = Number(((prdy_vrss / prevPrpr) * 100).toFixed(2));
     const direction: "up" | "down" | "flat" = prdy_vrss > 0 ? "up" : prdy_vrss < 0 ? "down" : "flat";
 
     return {
       label: "원/달러",
       value: prpr.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
       change: (prdy_vrss > 0 ? "+" : "") + prdy_vrss.toFixed(2),
-      changePercent: (prdy_vrss > 0 ? "+" : "") + (out.prdy_ctrt || "0.00") + "%",
+      changePercent: (prdy_vrss > 0 ? "+" : "") + prdy_ctrt.toFixed(2) + "%",
       direction
     };
   } catch (error) {
+    console.error("fetchExchangeRate exception:", error);
     return null;
   }
 }
 
 /**
  * 국내 증시자금 종합 데이터를 가져옵니다. (고객예탁금 등)
+ * TR_ID: FHKST649100C0
  */
 export async function fetchMarketFunds(): Promise<MarketFundsData | null> {
   const token = await getAccessToken();
   const appKey = process.env.KIS_APP_KEY!;
   const appSecret = process.env.KIS_APP_SECRET!;
 
-  const url = `${KIS_BASE_URL}/uapi/domestic-stock/v1/quotations/mktfunds`;
+  // FID_INPUT_DATE_1은 생략 시 최근 영업일
+  const url = `${KIS_BASE_URL}/uapi/domestic-stock/v1/quotations/mktfunds?FID_INPUT_DATE_1=`;
 
   const headers = {
     "Content-Type": "application/json",
     authorization: `Bearer ${token}`,
     appkey: appKey,
     appsecret: appSecret,
-    tr_id: "FHPTJ04500000",
+    tr_id: "FHKST649100C0",
     custtype: "P",
   };
 
   try {
-    const res = await fetch(url, { headers, cache: "no-store" });
+    const res = await fetchWithTimeout(url, { headers, cache: "no-store" });
     if (!res.ok) return null;
 
     const data = await res.json();
-    if (data.rt_cd !== "0" || !data.output) return null;
+    if (data.rt_cd !== "0" || !data.output) {
+        console.error(`fetchMarketFunds KIS 에러: [${data.rt_cd}] ${data.msg1}`);
+        return null;
+    }
 
-    const latest = Array.isArray(data.output) ? data.output[0] : data.output;
+    const latest = data.output; // FHKST649100C0는 output이 배열이 아닌 객체로 올 수 있음
 
     return {
-      date: latest.stck_bsop_date,
-      deposit: Number(latest.cstmr_u_ast_amt || 0),
-      margin_loan: Number(latest.shcl_und_amt || 0),
-      misu: Number(latest.entr_asst_amt || 0),
+      date: latest.stck_bsop_date || "",
+      deposit: Number(latest.cstmr_u_ast_amt || 0) * 100000000, // 억원 단위 -> 원 단위 환산
+      margin_loan: Number(latest.shcl_und_amt || 0) * 100000000,
+      misu: Number(latest.entr_asst_amt || 0) * 100000000,
     };
   } catch (error) {
+    console.error("fetchMarketFunds exception:", error);
     return null;
   }
 }
@@ -251,20 +278,23 @@ export async function fetchDailyCreditBalance(days = 20): Promise<CreditBalanceD
     authorization: `Bearer ${token}`,
     appkey: appKey,
     appsecret: appSecret,
-    tr_id: "FHKST03030100",
+    tr_id: "FHPST01740000",
     custtype: "P",
   };
 
   try {
-    const res = await fetch(url, { headers, cache: "no-store" });
+    const res = await fetchWithTimeout(url, { headers, cache: "no-store" });
     if (!res.ok) return [];
 
     const data = await res.json();
-    if (data.rt_cd !== "0" || !data.output) return [];
+    if (data.rt_cd !== "0" || !data.output) {
+        console.error(`fetchDailyCreditBalance KIS 에러: [${data.rt_cd}] ${data.msg1}`);
+        return [];
+    }
 
     return (data.output as any[]).slice(0, days).map(item => ({
       date: item.stck_bsop_date,
-      amount: Number(item.shcl_und_amt || 0),
+      amount: Number(item.shcl_und_amt || 0) * 100000000, // 억원 단위 -> 원 단위 환산
       ratio: Number(item.shcl_und_amt_icrt || 0),
     })).reverse();
   } catch (error) {
@@ -336,7 +366,7 @@ export async function fetchNewHighCount(): Promise<number> {
     };
 
     try {
-      const res = await fetch(url, { headers, cache: "no-store" });
+      const res = await fetchWithTimeout(url, { headers, cache: "no-store" });
       if (!res.ok) return 0;
       const data = await res.json();
       if (data.rt_cd !== "0" || !data.output) return 0;
@@ -348,7 +378,7 @@ export async function fetchNewHighCount(): Promise<number> {
 
   const [kospiCount, kosdaqCount] = await Promise.all([
     fetchMarketHigh('J'),
-    fetchMarketHigh('W')
+    fetchMarketHigh('Q') // KOSDAQ 구분 코드 수정: W -> Q
   ]);
 
   return kospiCount + kosdaqCount;
