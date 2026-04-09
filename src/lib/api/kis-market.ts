@@ -271,7 +271,7 @@ export async function fetchDailyCreditBalance(days = 20): Promise<CreditBalanceD
   const startStr = formatYYYYMMDD(startDate);
   const endStr = formatYYYYMMDD(endDate);
 
-  const url = `${KIS_BASE_URL}/uapi/domestic-stock/v1/quotations/daily-credit-balance?FID_COND_MRKT_DIV_CODE=J&FID_INPUT_ISCD=0000&FID_INPUT_DATE_1=${startStr}&FID_INPUT_DATE_2=${endStr}&FID_PERIOD_DIV_CODE=D`;
+  const url = `${KIS_BASE_URL}/uapi/domestic-stock/v1/quotations/daily-credit-balance?FID_COND_MRKT_DIV_CODE=J&FID_COND_SCR_DIV_CODE=20476&FID_INPUT_ISCD=0000&FID_INPUT_DATE_1=${startStr}&FID_PERIOD_DIV_CODE=D`;
 
   const headers = {
     "Content-Type": "application/json",
@@ -352,7 +352,7 @@ export async function fetchNewHighCount(): Promise<number> {
   const appKey = process.env.KIS_APP_KEY!;
   const appSecret = process.env.KIS_APP_SECRET!;
 
-  const fetchMarketHigh = async (market: 'J' | 'W') => {
+  const fetchMarketHigh = async (market: 'J' | 'Q') => {
     // psearch-high-low 엔드포인트 사용
     const url = `${KIS_BASE_URL}/uapi/domestic-stock/v1/quotations/psearch-high-low?FID_COND_MRKT_DIV_CODE=${market}&FID_INPUT_ISCD=0000&FID_DIV_CLS_CODE=0&FID_RANK_SORT_CLS_CODE=0&FID_ETC_CLS_CODE=0`;
 
@@ -378,7 +378,7 @@ export async function fetchNewHighCount(): Promise<number> {
 
   const [kospiCount, kosdaqCount] = await Promise.all([
     fetchMarketHigh('J'),
-    fetchMarketHigh('Q') // KOSDAQ 구분 코드 수정: W -> Q
+    fetchMarketHigh('Q')
   ]);
 
   return kospiCount + kosdaqCount;
