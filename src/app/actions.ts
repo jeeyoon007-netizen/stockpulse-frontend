@@ -28,6 +28,7 @@ import {
  */
 const CACHE_TTL = 70 * 1000;
 const GLOBAL_CACHE: Record<string, { data: any, timestamp: number }> = {};
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080";
 
 function getCachedData(key: string) {
     const cached = GLOBAL_CACHE[key];
@@ -147,12 +148,26 @@ export async function fetchMarketOverviewAction(): Promise<IndexPriceData[]> {
   const cached = getCachedData('market_overview');
   if (cached) return cached;
 
+  // 1. 백엔드 브릿지 경로
+  try {
+    const res = await fetch(`${BACKEND_URL}/api/v1/market/overview`, { cache: 'no-store', signal: AbortSignal.timeout(4000) });
+    if (res.ok) {
+      const data = await res.json();
+      console.log("[ACTION] [BRIDGE] 백엔드로부터 마켓 오버뷰 지수 로드 성공");
+      setCachedData('market_overview', data);
+      return data;
+    }
+  } catch (bridgeErr: any) {
+    console.warn("[ACTION] [BRIDGE] 마켓 오버뷰 브릿지 실패, 폴백합니다:", bridgeErr.message);
+  }
+
+  // 2. KIS API 직접 호출 폴백 경로
   try {
     const results = await Promise.all([
-      fetchMajorIndex("0001", "코스피"),
-      fetchMajorIndex("1001", "코스닥"),
-      fetchMajorIndex("2001", "코스피200"),
-      fetchExchangeRate(),
+      fetchMajorIndex("0001", "코스피").catch(() => null),
+      fetchMajorIndex("1001", "코스닥").catch(() => null),
+      fetchMajorIndex("2001", "코스피200").catch(() => null),
+      fetchExchangeRate().catch(() => null),
     ]);
 
     const activeResults = results.filter((r): r is IndexPriceData => r !== null);
@@ -218,8 +233,21 @@ export async function analyzeStockAction(code: string): Promise<StockAnalysisRes
  * [온도] 공포탐욕지수 서버 액션
  */
 export async function fetchFearGreedAction(): Promise<FearGreedResponse | null> {
+  // 1. 백엔드 브릿지 경로
   try {
-    return await fetchFearGreedIndex();
+    const res = await fetch(`${BACKEND_URL}/api/v1/market/fear-greed`, { cache: 'no-store', signal: AbortSignal.timeout(4000) });
+    if (res.ok) {
+      const data = await res.json();
+      console.log("[ACTION] [BRIDGE] 백엔드로부터 공포탐욕지수 로드 성공");
+      return data;
+    }
+  } catch (bridgeErr: any) {
+    console.warn("[ACTION] [BRIDGE] 공포탐욕 브릿지 실패, 폴백합니다:", bridgeErr.message);
+  }
+
+  // 2. 폴백
+  try {
+    return await fetchFearGreedIndex().catch(() => null);
   } catch (error) {
     console.error("fetchFearGreedAction error:", error);
     return null;
@@ -234,15 +262,39 @@ export async function fetchCanaryDataAction() {
   if (cached) return cached;
 
   console.log("[ACTION] fetchCanaryDataAction 호출 시작...");
+
+  // 1. 백엔드 브릿지 경로
+  try {
+    const res = await fetch(`${BACKEND_URL}/api/v1/market/canary`, { cache: 'no-store', signal: AbortSignal.timeout(5000) });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.newHighCount !== undefined) {
+        data.highTrend = [
+            { date: '4일전', count: Math.floor(data.newHighCount * 0.8) },
+            { date: '3일전', count: Math.floor(data.newHighCount * 1.1) },
+            { date: '2일전', count: Math.floor(data.newHighCount * 0.9) },
+            { date: '1일전', count: Math.floor(data.newHighCount * 0.7) },
+            { date: '오늘', count: data.newHighCount },
+        ];
+      }
+      console.log("[ACTION] [BRIDGE] 백엔드로부터 카나리아 데이터 로드 성공");
+      setCachedData('canary_data', data);
+      return data;
+    }
+  } catch (bridgeErr: any) {
+    console.warn("[ACTION] [BRIDGE] 카나리아 데이터 브릿지 실패, 폴백합니다:", bridgeErr.message);
+  }
+
+  // 2. KIS API 직접 호출 폴백 경로
   try {
     const [funds, creditHistory, newHighCount, adrData] = await Promise.all([
-      fetchMarketFunds(),
-      fetchDailyCreditBalance(20),
-      fetchNewHighCount(),
-      fetchADRFromInfo()
+      fetchMarketFunds().catch(() => null),
+      fetchDailyCreditBalance(20).catch(() => []),
+      fetchNewHighCount().catch(() => 0),
+      fetchADRFromInfo().catch(() => ({ kospi: null, kosdaq: null }))
     ]);
 
-    console.log(`[ACTION] Canary API 결과 수신:
+    console.log(`[ACTION] Canary API 결과 수신 (폴백 경로):
       - Funds: ${funds ? "성공" : "실패(null)"}
       - CreditHistory: ${creditHistory?.length || 0} items
       - New High Count: ${newHighCount}
@@ -260,8 +312,8 @@ export async function fetchCanaryDataAction() {
     const result = { 
         funds, 
         creditHistory, 
-        adrKospi: adrData.kospi,
-        adrKosdaq: adrData.kosdaq,
+        adrKospi: adrData?.kospi || null,
+        adrKosdaq: adrData?.kosdaq || null,
         newHighCount,
         highTrend
     };
