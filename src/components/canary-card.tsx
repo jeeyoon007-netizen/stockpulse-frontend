@@ -76,7 +76,7 @@ export function CanaryCard({ data }: Props) {
               </div>
               <div className="flex items-baseline gap-1">
                 <span className="text-base md:text-lg font-black tracking-tighter">
-                    {funds ? formatMoney(funds.deposit) : "---"}
+                    {funds ? formatMoney(Math.round(funds.deposit / 100000000)) : "---"}
                 </span>
                 <span className="text-[8px] font-bold text-muted-foreground">원</span>
               </div>
@@ -109,7 +109,7 @@ export function CanaryCard({ data }: Props) {
           </div>
           <div className="flex items-baseline gap-2">
             <span className="text-lg md:text-xl font-black tracking-tighter">
-                {latestCredit ? (latestCredit.amount / 10000).toFixed(1) : "---"}
+                {latestCredit ? (latestCredit.amount / 1000000000000).toFixed(1) : "---"}
             </span>
             <span className="text-[10px] font-bold text-muted-foreground">조 원</span>
             {latestCredit && prevCredit && (
