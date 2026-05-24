@@ -24,12 +24,12 @@ export function FearGreedGauge({ data, title }: Props) {
   const rotation = (score / 100) * 180 - 90; // -90 to 90 degrees for half circle
 
   return (
-    <div className="flex flex-col items-center p-4 bg-background/40 rounded-xl border border-border/50 relative overflow-hidden group hover:border-primary/30 transition-all duration-300">
-      <h3 className="text-sm font-medium text-muted-foreground mb-4">{title}</h3>
+    <div className="flex flex-col items-center p-3 md:p-4 bg-background/40 rounded-xl border border-border/50 relative overflow-hidden group hover:border-primary/30 transition-all duration-300">
+      <h3 className="text-xs md:text-sm font-medium text-muted-foreground mb-3 md:mb-4">{title}</h3>
       
-      <div className="relative w-48 h-24 mb-6">
+      <div className="relative w-36 h-[72px] md:w-48 md:h-24 mb-4 md:mb-6">
         {/* Gauge Background (Semi-circle) */}
-        <div className="absolute inset-0 w-48 h-48 rounded-full border-[12px] border-muted/20 border-b-transparent"></div>
+        <div className="absolute inset-0 w-36 h-36 md:w-48 md:h-48 rounded-full border-[10px] md:border-[12px] border-muted/20 border-b-transparent"></div>
         
         {/* Gauge Color fill (Simplified with a overlay mask or just a SVG) */}
         <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 50">
@@ -55,7 +55,7 @@ export function FearGreedGauge({ data, title }: Props) {
 
         {/* Needle */}
         <div 
-          className="absolute bottom-0 left-1/2 w-1 h-20 bg-foreground origin-bottom rounded-full transition-transform duration-1000 ease-out z-10"
+          className="absolute bottom-0 left-1/2 w-1 h-16 md:h-20 bg-foreground origin-bottom rounded-full transition-transform duration-1000 ease-out z-10"
           style={{ transform: `translateX(-50%) rotate(${rotation}deg)` }}
         >
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-3 h-3 bg-foreground rounded-full shadow-lg"></div>
@@ -63,18 +63,18 @@ export function FearGreedGauge({ data, title }: Props) {
         
         {/* Center Text */}
         <div className="absolute bottom-[-10px] left-1/2 -translate-x-1/2 text-center">
-            <span className="text-4xl font-black tracking-tighter" style={{ color }}>{score}</span>
+            <span className="text-3xl md:text-4xl font-black tracking-tighter" style={{ color }}>{score}</span>
         </div>
       </div>
 
       <div className="text-center mt-2">
-        <span className="text-lg font-bold px-3 py-1 rounded-full bg-muted/30" style={{ color }}>
+        <span className="text-base md:text-lg font-bold px-3 py-1 rounded-full bg-muted/30" style={{ color }}>
           {label}
         </span>
       </div>
       
       {/* Indicators List (Small) */}
-      <div className="grid grid-cols-2 gap-x-4 gap-y-2 mt-6 w-full opacity-60 group-hover:opacity-100 transition-opacity">
+      <div className="grid grid-cols-2 gap-x-3 md:gap-x-4 gap-y-1.5 md:gap-y-2 mt-4 md:mt-6 w-full opacity-80 md:opacity-60 group-hover:opacity-100 transition-opacity">
         {data.indicators.slice(0, 4).map((ind, i) => (
           <div key={i} className="flex justify-between items-center text-[10px]">
             <span className="text-muted-foreground truncate mr-2">{ind.name}</span>

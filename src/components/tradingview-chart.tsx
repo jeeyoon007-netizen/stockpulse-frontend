@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createChart, ColorType } from "lightweight-charts";
 
 interface OHLCV {
@@ -18,6 +18,15 @@ interface TradingViewChartProps {
 
 export function TradingViewChart({ data }: TradingViewChartProps) {
   const chartContainerRef = useRef<HTMLDivElement>(null);
+  const [isMobile, setIsMobile] = useState(false);
+
+  // 모바일 감지
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
 
   useEffect(() => {
     if (!chartContainerRef.current || !data || data.length === 0) return;
@@ -38,17 +47,20 @@ export function TradingViewChart({ data }: TradingViewChartProps) {
       };
     });
 
+    const chartHeight = isMobile ? 240 : 360;
+
     const chart = createChart(chartContainerRef.current, {
       layout: {
         background: { type: ColorType.Solid, color: "transparent" },
         textColor: "rgba(255, 255, 255, 0.7)",
+        fontSize: isMobile ? 10 : 12,
       },
       grid: {
         vertLines: { color: "rgba(255, 255, 255, 0.05)" },
         horzLines: { color: "rgba(255, 255, 255, 0.05)" },
       },
       width: chartContainerRef.current.clientWidth,
-      height: 360,
+      height: chartHeight,
       timeScale: {
         borderColor: "rgba(255, 255, 255, 0.1)",
         timeVisible: true,
@@ -61,8 +73,10 @@ export function TradingViewChart({ data }: TradingViewChartProps) {
         pinch: true,
       },
       handleScroll: {
-        mouseWheel: true,   // 마우스 휠로 차트 이동은 허용 (옵션에 따라 다름, 보통 줌이 꺼지면 스크롤로 동작)
+        mouseWheel: true,   // 마우스 휠로 차트 이동은 허용
         pressedMouseMove: true,
+        horzTouchDrag: true, // 모바일 수평 터치 드래그 지원
+        vertTouchDrag: false, // 세로 터치는 페이지 스크롤에 양보
       },
     });
 
@@ -78,19 +92,22 @@ export function TradingViewChart({ data }: TradingViewChartProps) {
 
     chart.timeScale().fitContent();
 
-    const handleResize = () => {
-      if (chartContainerRef.current) {
-        chart.applyOptions({ width: chartContainerRef.current.clientWidth });
+    // ResizeObserver로 컨테이너 크기 변경 감지 (모바일 회전 등)
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width } = entry.contentRect;
+        if (width > 0) {
+          chart.applyOptions({ width });
+        }
       }
-    };
-
-    window.addEventListener("resize", handleResize);
+    });
+    resizeObserver.observe(chartContainerRef.current);
 
     return () => {
-      window.removeEventListener("resize", handleResize);
+      resizeObserver.disconnect();
       chart.remove();
     };
-  }, [data]);
+  }, [data, isMobile]);
 
-  return <div ref={chartContainerRef} className="w-full h-[360px]" />;
+  return <div ref={chartContainerRef} className="w-full h-[240px] md:h-[360px]" />;
 }

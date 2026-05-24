@@ -1,10 +1,29 @@
 import "server-only";
 
-export const KIS_BASE_URL = "https://openapi.koreainvestment.com:9443";
+const IS_VTS = process.env.KIS_VTS === "true";
+export const KIS_BASE_URL = IS_VTS 
+  ? "https://openapivts.koreainvestment.com:29443" 
+  : "https://openapi.koreainvestment.com:9443";
 
-// 서버 전용 인메모리 캐싱 (개발 환경 핫 리로드 시 초기화될 수 있음)
-let cachedToken = "";
-let tokenExpiry = 0;
+console.log(`[KIS API] Using ${IS_VTS ? "VIRTUAL" : "REAL"} server: ${KIS_BASE_URL}`);
+
+// 서버 전용 인메모리 캐싱 (개발 환경 핫 리로드 시 유실 방지를 위해 global 객체 사용)
+const globalForKis = global as unknown as {
+  cachedToken?: string;
+  tokenExpiry?: number;
+};
+
+function getCachedToken() {
+  return globalForKis.cachedToken || "";
+}
+function setCachedToken(token: string, expiry: number) {
+  globalForKis.cachedToken = token;
+  globalForKis.tokenExpiry = expiry;
+}
+function getTokenExpiry() {
+  return globalForKis.tokenExpiry || 0;
+}
+
 let tokenPromise: Promise<string> | null = null; // 동시 요청 방지
 
 export class AnalysisError extends Error {
@@ -19,6 +38,9 @@ export class AnalysisError extends Error {
  */
 export async function getAccessToken() {
   const now = Date.now();
+  const cachedToken = getCachedToken();
+  const tokenExpiry = getTokenExpiry();
+
   if (cachedToken && now < tokenExpiry) {
     return cachedToken;
   }
@@ -37,6 +59,7 @@ export async function getAccessToken() {
         throw new Error("환경변수에 KIS_APP_KEY 또는 KIS_APP_SECRET이 설정되지 않았습니다.");
       }
 
+      console.log("[KIS AUTH] Requesting new access token...");
       const res = await fetch(`${KIS_BASE_URL}/oauth2/tokenP`, {
         method: "POST",
         headers: {
@@ -48,22 +71,26 @@ export async function getAccessToken() {
           appsecret: appSecret,
         }),
         cache: "no-store",
-        // @ts-ignore - Next.js/Node fetch supports signal
+        // @ts-ignore
         signal: AbortSignal.timeout(10000)
       });
 
       if (!res.ok) {
         const errorBody = await res.text();
-        console.error(`[KIS AUTH ERROR] 토큰 발급 실패: ${res.status} | 원문: ${errorBody}`);
+        console.error(`[KIS AUTH ERROR] 토큰 발급 실패: ${res.status}`);
+        console.error(`[KIS AUTH ERROR] 원문: ${errorBody}`);
         throw new Error(`토큰 발급 실패: ${res.status} ${errorBody}`);
       }
 
       const data = await res.json();
-      cachedToken = data.access_token;
+      console.log("[KIS AUTH] Access token acquired successfully.");
+      const newToken = data.access_token;
       // 토큰 유효기간(expires_in)은 보통 86400초, 여유 시간 1시간(3600*1000) 빼고 설정
-      tokenExpiry = now + data.expires_in * 1000 - 3600000;
+      const newExpiry = now + data.expires_in * 1000 - 3600000;
+      
+      setCachedToken(newToken, newExpiry);
 
-      return cachedToken;
+      return newToken;
     } finally {
       // 처리가 완료(성공 혹은 실패)되면 잠금 해제
       tokenPromise = null;

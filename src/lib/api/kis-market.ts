@@ -21,6 +21,17 @@ async function fetchWithTimeout(url: string, options: RequestInit, timeout = 500
 
 // --- [Interfaces] ---
 
+export interface ADRMarketData {
+  adr: string;
+  time: string;
+  signal: string;
+}
+
+export interface ADRCombinedData {
+  kospi: ADRMarketData | null;
+  kosdaq: ADRMarketData | null;
+}
+
 export interface MarketFundsData {
   date: string;
   deposit: number;      // 고객예탁금
@@ -66,7 +77,29 @@ export async function fetchMajorIndex(code: string, label: string): Promise<Inde
   const appKey = process.env.KIS_APP_KEY!;
   const appSecret = process.env.KIS_APP_SECRET!;
 
-  const url = `${KIS_BASE_URL}/uapi/domestic-stock/v1/quotations/inquire-index-price?FID_COND_MRKT_DIV_CODE=U&FID_INPUT_ISCD=${code}`;
+  // 일차 시도: FID_COND_MRKT_DIV_CODE=U (기본 업종)
+  let result = await _fetchMajorIndexInternal(code, label, "U", token, appKey, appSecret);
+  
+  // 실패 시 이차 시도: FID_COND_MRKT_DIV_CODE=J (주식 시장 분류)
+  if (!result) {
+    console.warn(`fetchMajorIndex(${label}) 'U' 실패, 'J'로 재시도합니다.`);
+    result = await _fetchMajorIndexInternal(code, label, "J", token, appKey, appSecret);
+  }
+
+  // 여전히 실패 시 일별 시세로 보완
+  if (!result) {
+    console.warn(`fetchMajorIndex(${label}) 최종 실패. 일별 시세 전환.`);
+    return fetchMajorIndexLatest(code, label);
+  }
+
+  return result;
+}
+
+/**
+ * 내부 전용: 특정 시장 코드로 지수 조회
+ */
+async function _fetchMajorIndexInternal(code: string, label: string, market: string, token: string, appKey: string, appSecret: string): Promise<IndexPriceData | null> {
+  const url = `${KIS_BASE_URL}/uapi/domestic-stock/v1/quotations/inquire-index-price?FID_COND_MRKT_DIV_CODE=${market}&FID_INPUT_ISCD=${code}`;
 
   const headers = {
     "Content-Type": "application/json",
@@ -79,16 +112,12 @@ export async function fetchMajorIndex(code: string, label: string): Promise<Inde
 
   try {
     const res = await fetchWithTimeout(url, { headers, cache: "no-store" });
-    if (!res.ok) {
-        console.error(`fetchMajorIndex(${label}) HTTP 에러: ${res.status}`);
-        return null;
-    }
+    if (!res.ok) return null;
 
     const data = await res.json();
-
     if (data.rt_cd !== "0" || !data.output) {
-      console.warn(`fetchMajorIndex(${label}) KIS 응답 에러: [${data.rt_cd}] ${data.msg1}. 일별 시세 전환.`);
-      return fetchMajorIndexLatest(code, label);
+      console.warn(`_fetchMajorIndexInternal(${label}, ${market}) 에러: [${data.rt_cd}] ${data.msg1}`);
+      return null;
     }
 
     const out = data.output;
@@ -102,11 +131,10 @@ export async function fetchMajorIndex(code: string, label: string): Promise<Inde
       change: (prdy_vrss > 0 ? "+" : "") + prdy_vrss.toFixed(2),
       changePercent: (prdy_vrss > 0 ? "+" : "") + (out.bstp_nmix_prdy_ctrt || "0.00") + "%",
       direction,
-      advanceCount: Number(out.ascn_is_cnt || 0),
-      declineCount: Number(out.decn_is_cnt || 0),
+      advanceCount: Number(out.ascn_issu_cnt || 0),
+      declineCount: Number(out.down_issu_cnt || 0),
     };
   } catch (error) {
-    console.error(`fetchMajorIndex(${code}) exception:`, error);
     return null;
   }
 }
@@ -132,9 +160,11 @@ async function fetchMajorIndexLatest(code: string, label: string): Promise<Index
   };
 
   try {
+    console.log(`[KIS DEBUG] fetchMajorIndexLatest(${label}) URL: ${url}`);
     const res = await fetch(url, { headers, cache: "no-store" });
     if (!res.ok) return null;
     const data = await res.json();
+    console.log(`[KIS DEBUG] fetchMajorIndexLatest(${label}) 응답: rt_cd=${data.rt_cd}, msg=${data.msg1}`);
     if (data.rt_cd !== "0" || !data.output1 || !data.output1[0]) {
       console.error(`fetchMajorIndexLatest(${label}) KIS 에러: [${data.rt_cd}] ${data.msg1}`);
       return null;
@@ -158,16 +188,79 @@ async function fetchMajorIndexLatest(code: string, label: string): Promise<Index
 }
 
 /**
+ * http://www.adrinfo.kr/ 에서 KOSPI/KOSDAQ 실시간 ADR 정보를 크롤링하여 파싱합니다.
+ */
+export async function fetchADRFromInfo(): Promise<ADRCombinedData> {
+  const url = "http://www.adrinfo.kr/";
+  const result: ADRCombinedData = { kospi: null, kosdaq: null };
+  
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      },
+      signal: AbortSignal.timeout(5000)
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const html = await response.text();
+    
+    // KOSPI 파싱
+    const kospiBlockIndex = html.indexOf('<header>KOSPI</header>');
+    if (kospiBlockIndex !== -1) {
+      const kospiBlock = html.substring(kospiBlockIndex, kospiBlockIndex + 1000);
+      const timeMatch = kospiBlock.match(/<small>\s*(\d{4}-\d{2}-\d{2}\s*\([^)]+\))\s*<\/small>/);
+      const adrMatch = kospiBlock.match(/<h2 class="card-title">\s*([\d.]+)\s*<small>%<\/small>/);
+      
+      if (adrMatch && timeMatch) {
+        const adrVal = parseFloat(adrMatch[1].trim());
+        const signal = adrVal >= 120 ? "매도 검토 (과열)" : adrVal <= 80 ? "바닥권 신호 (과매도)" : "중립";
+        result.kospi = {
+          adr: adrMatch[1].trim(),
+          time: timeMatch[1].trim(),
+          signal
+        };
+      }
+    }
+    
+    // KOSDAQ 파싱
+    const kosdaqBlockIndex = html.indexOf('<header>KOSDAQ</header>');
+    if (kosdaqBlockIndex !== -1) {
+      const kosdaqBlock = html.substring(kosdaqBlockIndex, kosdaqBlockIndex + 1000);
+      const timeMatch = kosdaqBlock.match(/<small>\s*(\d{4}-\d{2}-\d{2}\s*\([^)]+\))\s*<\/small>/);
+      const adrMatch = kosdaqBlock.match(/<h2 class="card-title">\s*([\d.]+)\s*<small>%<\/small>/);
+      
+      if (adrMatch && timeMatch) {
+        const adrVal = parseFloat(adrMatch[1].trim());
+        const signal = adrVal >= 120 ? "매도 검토 (과열)" : adrVal <= 80 ? "바닥권 신호 (과매도)" : "중립";
+        result.kosdaq = {
+          adr: adrMatch[1].trim(),
+          time: timeMatch[1].trim(),
+          signal
+        };
+      }
+    }
+  } catch (error: any) {
+    console.error("fetchADRFromInfo exception:", error.message);
+  }
+  
+  return result;
+}
+
+/**
  * 주요 환율 정보를 가져옵니다. (원/달러)
  * 한국은행 ECOS Open API를 사용하도록 변경됨
  */
 export async function fetchExchangeRate(): Promise<IndexPriceData | null> {
   const BOK_API_KEY = process.env.BOK_API_KEY || "D7Z1MD14MIETKMYQBYYB";
-  
+
   const today = new Date();
   const past = new Date();
   past.setDate(today.getDate() - 14); // 주말, 휴일 감안하여 14일 전부터 조회
-  
+
   const startStr = formatYYYYMMDD(past);
   const endStr = formatYYYYMMDD(today);
 
@@ -179,7 +272,7 @@ export async function fetchExchangeRate(): Promise<IndexPriceData | null> {
     if (!res.ok) return null;
 
     const data = await res.json();
-    
+
     if (!data.StatisticSearch || !data.StatisticSearch.row || data.StatisticSearch.row.length < 2) {
       console.error(`fetchExchangeRate 한국은행 API 에러: 데이터 부족`);
       return null;
@@ -192,7 +285,7 @@ export async function fetchExchangeRate(): Promise<IndexPriceData | null> {
 
     const prpr = Number(latest.DATA_VALUE || 0);
     const prevPrpr = Number(previous.DATA_VALUE || 0);
-    
+
     // 전일 대비 증감 및 등락률 계산
     const prdy_vrss = Number((prpr - prevPrpr).toFixed(2));
     const prdy_ctrt = Number(((prdy_vrss / prevPrpr) * 100).toFixed(2));
@@ -220,9 +313,11 @@ export async function fetchMarketFunds(): Promise<MarketFundsData | null> {
   const appKey = process.env.KIS_APP_KEY!;
   const appSecret = process.env.KIS_APP_SECRET!;
 
-  // FID_INPUT_DATE_1은 생략 시 최근 영업일
-  const url = `${KIS_BASE_URL}/uapi/domestic-stock/v1/quotations/mktfunds?FID_INPUT_DATE_1=`;
-
+  const dateStr = formatYYYYMMDD(new Date());
+  const url = `${KIS_BASE_URL}/uapi/domestic-stock/v1/quotations/mktfunds?FID_INPUT_DATE_1=${dateStr}`;
+  
+  console.log(`[KIS DEBUG] fetchMarketFunds URL: ${url}`);
+  
   const headers = {
     "Content-Type": "application/json",
     authorization: `Bearer ${token}`,
@@ -237,9 +332,10 @@ export async function fetchMarketFunds(): Promise<MarketFundsData | null> {
     if (!res.ok) return null;
 
     const data = await res.json();
+    console.log(`[KIS DEBUG] fetchMarketFunds 응답: rt_cd=${data.rt_cd}, msg=${data.msg1}`);
     if (data.rt_cd !== "0" || !data.output) {
-        console.error(`fetchMarketFunds KIS 에러: [${data.rt_cd}] ${data.msg1}`);
-        return null;
+      console.error(`fetchMarketFunds KIS 에러: [${data.rt_cd}] ${data.msg1}`);
+      return null;
     }
 
     const latest = data.output; // FHKST649100C0는 output이 배열이 아닌 객체로 올 수 있음
@@ -271,25 +367,27 @@ export async function fetchDailyCreditBalance(days = 20): Promise<CreditBalanceD
   const startStr = formatYYYYMMDD(startDate);
   const endStr = formatYYYYMMDD(endDate);
 
-  const url = `${KIS_BASE_URL}/uapi/domestic-stock/v1/quotations/daily-credit-balance?FID_COND_MRKT_DIV_CODE=J&FID_COND_SCR_DIV_CODE=20476&FID_INPUT_ISCD=0000&FID_INPUT_DATE_1=${startStr}&FID_PERIOD_DIV_CODE=D`;
+  const url = `${KIS_BASE_URL}/uapi/domestic-stock/v1/quotations/daily-credit-balance?FID_COND_MRKT_DIV_CODE=J&FID_COND_SCR_DIV_CODE=20476&FID_INPUT_ISCD=0000&FID_INPUT_DATE_1=${startStr}`;
 
   const headers = {
     "Content-Type": "application/json",
     authorization: `Bearer ${token}`,
     appkey: appKey,
     appsecret: appSecret,
-    tr_id: "FHPST01740000",
+    tr_id: "FHPST04760000",
     custtype: "P",
   };
 
   try {
+    console.log(`[KIS DEBUG] fetchDailyCreditBalance URL: ${url}`);
     const res = await fetchWithTimeout(url, { headers, cache: "no-store" });
     if (!res.ok) return [];
 
     const data = await res.json();
+    console.log(`[KIS DEBUG] fetchDailyCreditBalance 응답: rt_cd=${data.rt_cd}, msg=${data.msg1}`);
     if (data.rt_cd !== "0" || !data.output) {
-        console.error(`fetchDailyCreditBalance KIS 에러: [${data.rt_cd}] ${data.msg1}`);
-        return [];
+      console.error(`fetchDailyCreditBalance KIS 에러: [${data.rt_cd}] ${data.msg1}`);
+      return [];
     }
 
     return (data.output as any[]).slice(0, days).map(item => ({
@@ -310,75 +408,119 @@ export async function fetchInvestorRanking(type: '1' | '2', market = '0001'): Pr
   const appKey = process.env.KIS_APP_KEY!;
   const appSecret = process.env.KIS_APP_SECRET!;
 
-  const url = `${KIS_BASE_URL}/uapi/domestic-stock/v1/quotations/inquire-investor?FID_COND_MRKT_DIV_CODE=V&FID_INPUT_ISCD=${market}&FID_DIV_CLS_CODE=1&FID_RANK_SORT_CLS_CODE=0&FID_ETC_CLS_CODE=${type}`;
+  // [롤백 및 필드 수정] 가집계 API (FHPTJ04400000)
+  // 아까 종목명이 유일하게 나왔던 지점으로 돌아가되, 금액 필드(pbmn)를 정확히 매핑
+  const url = `${KIS_BASE_URL}/uapi/domestic-stock/v1/quotations/foreign-institution-total?` +
+    `FID_COND_MRKT_DIV_CODE=V&` +
+    `FID_COND_SCR_DIV_CODE=16449&` +
+    `FID_INPUT_ISCD=${market}&` +
+    `FID_DIV_CLS_CODE=1&` + // 1: 금액정렬
+    `FID_RANK_SORT_CLS_CODE=0&` + // 0: 순매수상위
+    `FID_ETC_CLS_CODE=${type}`; // 1: 외인, 2: 기관
 
   const headers = {
     "Content-Type": "application/json",
     authorization: `Bearer ${token}`,
     appkey: appKey,
     appsecret: appSecret,
-    tr_id: "FHPTJ04400000", // 투자자매매가집계
+    tr_id: "FHPTJ04400000",
     custtype: "P",
   };
 
   try {
+    console.log(`[KIS DEBUG] fetchInvestorRanking 요청 URL: ${url}`);
     const res = await fetch(url, { headers, cache: "no-store" });
-    if (!res.ok) return [];
-
     const data = await res.json();
-    if (data.rt_cd !== "0" || !data.output) return [];
+    
+    console.log(`[KIS DEBUG] fetchInvestorRanking 응답: rt_cd=${data.rt_cd}, msg=${data.msg1}, items=${data.output?.length || 0}`);
 
-    return (data.output as any[]).slice(0, 20).map(item => ({
-      rank: Number(item.data_rank),
-      code: item.mksc_shrn_iscd,
-      name: item.hts_kor_isnm,
-      price: Number(item.stck_prpr),
-      change: Number(item.prdy_vrss),
-      changePercent: Number(item.prdy_ctrt),
-      volume: Number(item.acml_vol),
-      amount: Number(item.frgn_ntby_amt || item.orgn_ntby_amt || 0),
-    }));
+    if (data.rt_cd !== "0" || !data.output) {
+      console.warn(`fetchInvestorRanking 에러: [${data.rt_cd}] ${data.msg1}`);
+      return [];
+    }
+
+    return (data.output as any[]).slice(0, 10).map((item, index) => {
+      // 실제 확인된 필드명: frgn_ntby_tr_pbmn, orgn_ntby_tr_pbmn
+      const foreignAmt = item.frgn_ntby_tr_pbmn || "0";
+      const instAmt = item.orgn_ntby_tr_pbmn || "0";
+      const rawAmount = type === '1' ? foreignAmt : instAmt;
+      
+      return {
+        rank: index + 1,
+        code: item.mksc_shrn_iscd || item.hts_shrn_iscd, 
+        name: item.hts_kor_isnm,
+        price: Number(item.stck_prpr || 0),
+        change: Number(item.prdy_vrss || 0),
+        changePercent: Number(item.prdy_ctrt || 0),
+        volume: Number(item.acml_vol || 0),
+        amount: Number(rawAmount) * 1000000, // 백만단위 -> 원 단위 환산
+      };
+    });
+
   } catch (error) {
+    console.error("fetchInvestorRanking exception:", error);
     return [];
   }
 }
 
-/**
- * 당일 52주 신고가 종목 수를 가져옵니다.
- * TR_ID: FHKST01010700 (국내주식 신고가/신저가)
- */
 export async function fetchNewHighCount(): Promise<number> {
   const token = await getAccessToken();
   const appKey = process.env.KIS_APP_KEY!;
   const appSecret = process.env.KIS_APP_SECRET!;
 
-  const fetchMarketHigh = async (market: 'J' | 'Q') => {
-    // psearch-high-low 엔드포인트 사용
-    const url = `${KIS_BASE_URL}/uapi/domestic-stock/v1/quotations/psearch-high-low?FID_COND_MRKT_DIV_CODE=${market}&FID_INPUT_ISCD=0000&FID_DIV_CLS_CODE=0&FID_RANK_SORT_CLS_CODE=0&FID_ETC_CLS_CODE=0`;
+  const fetchMarketHigh = async (marketCode: '0001' | '1001'): Promise<number> => {
+    let totalItems: any[] = [];
+    let trCont = "";
+    
+    // 최대 5페이지까지 가져오도록 제한 (무한루프 방지 및 150종목 확보 가능)
+    for (let i = 0; i < 5; i++) {
+        const url = `${KIS_BASE_URL}/uapi/domestic-stock/v1/ranking/near-new-highlow?fid_cond_mrkt_div_code=J&fid_cond_scr_div_code=20187&fid_div_cls_code=0&fid_input_cnt_1=0&fid_input_cnt_2=0&fid_prc_cls_code=0&fid_input_iscd=${marketCode}&fid_trgt_cls_code=0&fid_trgt_exls_cls_code=0&fid_aply_rang_prc_1=0&fid_aply_rang_prc_2=1000000&fid_aply_rang_vol=0`;
 
-    const headers = {
-      "Content-Type": "application/json",
-      authorization: `Bearer ${token}`,
-      appkey: appKey,
-      appsecret: appSecret,
-      tr_id: "FHKST01010700",
-      custtype: "P",
-    };
+        const headers: any = {
+            "Content-Type": "application/json",
+            authorization: `Bearer ${token}`,
+            appkey: appKey,
+            appsecret: appSecret,
+            tr_id: "FHPST01870000",
+            custtype: "P",
+        };
+        
+        if (trCont) {
+            headers.tr_cont = trCont;
+        }
 
-    try {
-      const res = await fetchWithTimeout(url, { headers, cache: "no-store" });
-      if (!res.ok) return 0;
-      const data = await res.json();
-      if (data.rt_cd !== "0" || !data.output) return 0;
-      return Array.isArray(data.output) ? data.output.length : 0;
-    } catch {
-      return 0;
+        try {
+            const res = await fetchWithTimeout(url, { headers, cache: "no-store" });
+            if (!res.ok) break;
+            
+            // 연속 호출용 tr_cont 헤더 추출
+            trCont = res.headers.get("tr_cont") || "";
+            
+            const data = await res.json();
+            if (data.rt_cd === "0" && Array.isArray(data.output)) {
+                totalItems = [...totalItems, ...data.output];
+            } else {
+                break;
+            }
+            
+            // 더 이상 데이터가 없으면 중단
+            if (trCont !== "M" && trCont !== "F") break;
+            
+            // API 초과 호출 방지 (매우 짧은 대기)
+            await new Promise(r => setTimeout(r, 50));
+        } catch (error) {
+            console.error(`fetchMarketHigh(${marketCode}) error at page ${i+1}:`, error);
+            break;
+        }
     }
+    
+    console.log(`[KIS DEBUG] fetchNewHighCount(${marketCode}) 최종 수집합계: ${totalItems.length}`);
+    return totalItems.length;
   };
 
   const [kospiCount, kosdaqCount] = await Promise.all([
-    fetchMarketHigh('J'),
-    fetchMarketHigh('Q')
+    fetchMarketHigh('0001'), // KOSPI
+    fetchMarketHigh('1001')  // KOSDAQ
   ]);
 
   return kospiCount + kosdaqCount;
@@ -388,12 +530,12 @@ export async function fetchNewHighCount(): Promise<number> {
  * 특정 종목의 상세 정보(시가총액, 업종 등)를 가져옵니다.
  * TR_ID: FHKST01010100 (주식현재가 시세)
  */
-export async function fetchStockDetail(code: string) {
+export async function fetchStockDetail(code: string, marketDiv = 'J') {
   const token = await getAccessToken();
   const appKey = process.env.KIS_APP_KEY!;
   const appSecret = process.env.KIS_APP_SECRET!;
 
-  const url = `${KIS_BASE_URL}/uapi/domestic-stock/v1/quotations/inquire-price?FID_COND_MRKT_DIV_CODE=J&FID_INPUT_ISCD=${code}`;
+  const url = `${KIS_BASE_URL}/uapi/domestic-stock/v1/quotations/inquire-price?FID_COND_MRKT_DIV_CODE=${marketDiv}&FID_INPUT_ISCD=${code}`;
 
   const headers = {
     "Content-Type": "application/json",

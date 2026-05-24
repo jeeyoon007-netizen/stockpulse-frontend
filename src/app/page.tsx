@@ -65,10 +65,8 @@ export default function DashboardPage() {
   const [canaryData, setCanaryData] = useState<any>({ 
     funds: null, 
     creditHistory: [], 
-    adr: "0", 
-    adrSignal: "대기 중", 
-    advanceCount: 0, 
-    declineCount: 0,
+    adrKospi: null,
+    adrKosdaq: null,
     newHighCount: 0,
     highTrend: []
   });
@@ -146,35 +144,37 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="p-6 lg:p-8 space-y-8 max-w-[1600px] mx-auto">
+    <div className="px-5 py-4 md:px-6 md:py-6 lg:px-8 lg:py-8 space-y-6 md:space-y-8 w-full max-w-[1600px] mx-auto">
       {/* Page Header */}
-      <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-black tracking-tighter">AI STOCK DASHBOARD</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            실시간 주식 시세 및 AI 입체 분석 • 한국투자증권 OPEN API 연동
-          </p>
-        </div>
-        <div className="flex items-center gap-2 text-xs text-muted-foreground bg-secondary/50 px-3 py-1.5 rounded-full border border-border/50 shadow-sm">
-          <Clock className="w-3.5 h-3.5 text-primary" />
-          <span className="font-mono">{timeStr}</span>
-          <div className="w-1.5 h-1.5 rounded-full bg-stock-up animate-pulse" />
+      <header className="flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl md:text-3xl font-black tracking-tighter">AI STOCK DASHBOARD</h1>
+            <p className="text-[11px] md:text-sm text-muted-foreground mt-0.5">
+              실시간 주식 시세 및 AI 입체 분석
+            </p>
+          </div>
+          <div className="flex items-center gap-1.5 text-[10px] md:text-xs text-muted-foreground bg-secondary/50 px-2.5 py-1 rounded-full border border-border/50 shadow-sm shrink-0">
+            <Clock className="w-3 h-3 text-primary" />
+            <span className="font-mono">{timeStr}</span>
+            <div className="w-1.5 h-1.5 rounded-full bg-stock-up animate-pulse" />
+          </div>
         </div>
       </header>
 
       {/* Market Overview (Real-time Indexes) */}
       <section id="market-overview" className="animate-in fade-in slide-in-from-top-4 duration-700">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 md:gap-4">
           {marketOverview.length > 0 ? marketOverview.map((item) => (
             <Card
               key={item.label}
               className="card-glow border-border/50 hover:border-primary/30 transition-all duration-300 bg-background/30 shadow-sm"
             >
-              <CardContent className="p-4">
+              <CardContent className="p-3 md:p-4">
                 <div className="flex flex-col">
-                  <span className="text-[10px] font-bold text-muted-foreground mb-1 uppercase tracking-widest">{item.label}</span>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xl font-black tracking-tighter font-mono">{item.value}</span>
+                  <span className="text-[9px] md:text-[10px] font-bold text-muted-foreground mb-0.5 uppercase tracking-widest">{item.label}</span>
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="text-sm md:text-xl font-black tracking-tighter font-mono truncate">{item.value}</span>
                     <div className={`flex items-center gap-1 text-[10px] font-black ${directionColor(item.direction)}`}>
                         <DirectionIcon direction={item.direction} />
                         {item.changePercent}
@@ -216,7 +216,7 @@ export default function DashboardPage() {
           
           <CardContent className="pt-5 space-y-6">
             <div className="flex flex-col sm:flex-row gap-3">
-              <div className="relative flex-1 max-w-sm">
+              <div className="relative flex-1 w-full md:max-w-sm">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <input
                   type="text"
@@ -251,7 +251,7 @@ export default function DashboardPage() {
                           {filteredStocks.map(stock => (
                             <li 
                               key={stock.code}
-                              className="px-4 py-2.5 hover:bg-primary/10 cursor-pointer flex justify-between items-center group border-b border-border/30 last:border-0"
+                              className="px-4 py-3 md:py-2.5 hover:bg-primary/10 cursor-pointer flex justify-between items-center group border-b border-border/30 last:border-0"
                               onClick={() => {
                                  setStockCode(stock.code);
                                  setSearchInput(stock.name);
@@ -273,7 +273,7 @@ export default function DashboardPage() {
               <Button 
                 onClick={() => handleAnalyze()} 
                 disabled={isAnalyzing || (!stockCode && searchInput.length === 0)}
-                className="gap-2 sm:w-auto w-full transition-all shadow-lg shadow-primary/20 h-[42px] px-6"
+                className="gap-2 w-full sm:w-auto transition-all shadow-lg shadow-primary/20 h-[44px] px-6"
               >
                 <Bot className="w-4 h-4" />
                 {isAnalyzing ? "AI 분석 중..." : "분석 시작"}
@@ -303,9 +303,9 @@ export default function DashboardPage() {
                 
                 <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
                   <div>
-                    <h3 className="text-3xl font-black">{analysisResult.stockData.name} <span className="text-lg text-muted-foreground font-mono font-normal tracking-wider ml-1">({analysisResult.stockData.code})</span></h3>
+                    <h3 className="text-xl md:text-3xl font-black">{analysisResult.stockData.name} <span className="text-sm md:text-lg text-muted-foreground font-mono font-normal tracking-wider ml-1">({analysisResult.stockData.code})</span></h3>
                     <div className="flex items-center gap-3 mt-1.5">
-                      <span className="text-2xl font-black font-mono tracking-tighter">
+                      <span className="text-lg md:text-2xl font-black font-mono tracking-tighter">
                          ₩{analysisResult.stockData.currentPrice.toLocaleString()}
                       </span>
                       <Badge variant="outline" className={`border-current font-bold ${directionColor(analysisResult.stockData.change > 0 ? "up" : "down")}`}>
@@ -407,7 +407,7 @@ export default function DashboardPage() {
       </section>
 
       {/* --- [Market Indicators Section: Canary | Temperature | Investor Flow] --- */}
-      <section id="market-indicators" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <section id="market-indicators" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
         {/* [Canary] */}
         <div className="flex flex-col h-full animate-in fade-in slide-in-from-left-4 duration-500 delay-100">
            <CanaryCard data={canaryData} />
@@ -429,7 +429,13 @@ export default function DashboardPage() {
 
         {/* [Investor Flow] */}
         <div className="flex flex-col h-full animate-in fade-in slide-in-from-right-4 duration-500 delay-300">
-           <InvestorFlowCard />
+           <InvestorFlowCard 
+             onAnalyze={(code, name) => {
+               setStockCode(code);
+               setSearchInput(name);
+               handleAnalyze(code);
+             }} 
+           />
         </div>
       </section>
 

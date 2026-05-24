@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { type InvestorFlowData } from "@/lib/api/kis-market";
 import { fetchInvestorFlowAnalysisAction } from "@/app/actions";
-import { Users, Building, TrendingUp, TrendingDown, Minus, Zap, Target, Search, Activity } from "lucide-react";
+import { Users, Building, TrendingUp, TrendingDown, Minus, Zap, Target, Search, Activity, Bot } from "lucide-react";
 
-export function InvestorFlowCard() {
+export function InvestorFlowCard({ onAnalyze }: { onAnalyze?: (code: string, name: string) => void }) {
   const [market, setMarket] = useState<'0001' | '1001'>('0001'); // 0001: KOSPI, 1001: KOSDAQ
   const [analysis, setAnalysis] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [confirmState, setConfirmState] = useState<{ x: number, y: number, code: string, name: string } | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -18,9 +19,15 @@ export function InvestorFlowCard() {
     load();
   }, [market]);
 
+  const handleStockClick = (e: React.MouseEvent, code: string, name: string) => {
+    setConfirmState({ x: e.clientX, y: e.clientY, code, name });
+  };
+
   const formatAmount = (a: number) => {
-    if (a >= 1000) return (a / 1000).toFixed(1) + "0억";
-    return a.toLocaleString() + "억";
+    if (a === 0) return "-";
+    // 억 단위 환산 (1억 = 10^8)
+    const inEok = a / 100000000;
+    return inEok.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + "억";
   };
 
   const StockList = ({ title, data, icon: Icon, color }: { title: string, data: InvestorFlowData[], icon: any, color: string }) => (
@@ -31,10 +38,14 @@ export function InvestorFlowCard() {
         </div>
         <div className="space-y-0.5">
             {data.map((item, idx) => (
-                <div key={item.code} className="flex justify-between items-center py-1.5 px-2 hover:bg-muted/30 rounded transition-colors group cursor-default">
+                <div 
+                  key={`${item.code}-${idx}`} 
+                  className="flex justify-between items-center py-1.5 px-2 hover:bg-yellow-500/10 rounded-md transition-all group cursor-pointer border-l-2 border-transparent hover:border-yellow-500"
+                  onClick={(e) => handleStockClick(e, item.code, item.name)}
+                >
                     <div className="flex items-center gap-2 min-w-0">
                         <span className="text-[9px] text-muted-foreground font-mono w-3">{idx + 1}</span>
-                        <span className="text-[10.5px] font-bold truncate max-w-[80px] group-hover:text-primary transition-colors">{item.name}</span>
+                        <span className="text-[10.5px] font-bold truncate max-w-[80px]">{item.name}</span>
                     </div>
                     <div className="flex flex-col items-end">
                         <span className={`text-[10px] font-black ${color}`}>{formatAmount(item.amount)}</span>
@@ -46,7 +57,7 @@ export function InvestorFlowCard() {
   );
 
   return (
-    <div className="flex flex-col p-4 bg-background/40 rounded-xl border border-border/50 h-full overflow-hidden hover:border-chart-2/30 transition-all group">
+    <div className="flex flex-col p-4 bg-background/40 rounded-xl border border-border/50 h-full overflow-hidden hover:border-chart-2/30 transition-all group relative">
       <div className="flex justify-between items-center mb-5">
         <h3 className="text-sm font-bold text-muted-foreground flex items-center gap-2 tracking-tight">
             <Users className="w-4 h-4 text-chart-2" />
@@ -97,8 +108,12 @@ export function InvestorFlowCard() {
                                 <span>양매수 동시 포착 종목</span>
                             </div>
                             <div className="flex flex-wrap gap-1.5 ">
-                                {analysis.overlap.length > 0 ? analysis.overlap.map((name: string) => (
-                                    <span key={name} className="px-2 py-0.5 bg-stock-up/10 text-stock-up text-[10px] font-bold rounded-full border border-stock-up/20 animate-pulse">{name}</span>
+                                {analysis.overlap.length > 0 ? analysis.overlap.map((item: {name: string, code: string}, idx: number) => (
+                                    <span 
+                                      key={`${item.code}-${idx}`} 
+                                      className="px-2 py-0.5 bg-stock-up/10 text-stock-up text-[10px] font-bold rounded-full border border-stock-up/20 cursor-pointer hover:bg-stock-up/20 transition-colors"
+                                      onClick={(e) => handleStockClick(e, item.code, item.name)}
+                                    >{item.name}</span>
                                 )) : <span className="text-[10px] text-muted-foreground italic">포착된 종목 없음</span>}
                             </div>
                         </div>
@@ -110,8 +125,8 @@ export function InvestorFlowCard() {
                                 <span>주도 산업군 (섹터)</span>
                             </div>
                             <div className="flex flex-wrap gap-1.5">
-                                {analysis.dominantIndustries.map((name: string) => (
-                                    <span key={name} className="px-2 py-0.5 bg-primary/10 text-primary text-[10px] font-bold rounded-full border border-primary/20">{name}</span>
+                                {analysis.dominantIndustries.map((name: string, idx: number) => (
+                                    <span key={`${name}-${idx}`} className="px-2 py-0.5 bg-primary/10 text-primary text-[10px] font-bold rounded-full border border-primary/20">{name}</span>
                                 ))}
                             </div>
                         </div>
@@ -119,12 +134,16 @@ export function InvestorFlowCard() {
                         {/* High Turnover */}
                         <div className="flex flex-col gap-1">
                             <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground mb-1">
-                                <Activity className="w-3 h-3 text-secondary" />
+                                <Activity className="w-3 h-3 text-amber-500" />
                                 <span>시총 대비 수급 집중주</span>
                             </div>
-                            <div className="flex flex-wrap gap-1.5">
-                                {analysis.highTurnover.length > 0 ? analysis.highTurnover.map((name: string) => (
-                                    <span key={name} className="px-2 py-0.5 bg-secondary/10 text-secondary text-[10px] font-bold rounded-full border border-secondary/20">{name}</span>
+                            <div className="flex flex-wrap gap-1.5 max-h-60 overflow-y-auto pr-1 thin-scrollbar">
+                                {analysis.highTurnover.length > 0 ? analysis.highTurnover.map((item: {name: string, code: string}, idx: number) => (
+                                    <span 
+                                      key={`${item.code}-${idx}`} 
+                                      className="px-2 py-0.5 bg-amber-500/20 text-amber-300 text-[10px] font-bold rounded-full border border-amber-500/30 cursor-pointer hover:bg-amber-500/40 transition-colors"
+                                      onClick={(e) => handleStockClick(e, item.code, item.name)}
+                                    >{item.name}</span>
                                 )) : <span className="text-[10px] text-muted-foreground italic">데이터 분석 중</span>}
                             </div>
                         </div>
@@ -138,6 +157,80 @@ export function InvestorFlowCard() {
             </div>
         )}
       </div>
+
+      {/* Confirm Popup: Desktop = mouse-following / Mobile = bottom sheet */}
+      {confirmState && (
+        <>
+          {/* Desktop popup (mouse-following) */}
+          <div 
+            className="hidden md:block fixed z-[9999] bg-background/95 backdrop-blur-xl border border-primary/30 rounded-xl shadow-2xl p-4 min-w-[220px] animate-in zoom-in-95 fade-in duration-200"
+            style={{ 
+              left: confirmState.x + 10, 
+              top: Math.min(confirmState.y + 10, typeof window !== 'undefined' ? window.innerHeight - 150 : confirmState.y) 
+            }}
+          >
+            <div className="flex items-center gap-2 mb-3">
+              <Bot className="w-4 h-4 text-primary" />
+              <span className="text-xs font-bold text-foreground">종목 분석을 할까요?</span>
+            </div>
+            <p className="text-[11px] font-bold text-muted-foreground mb-4">
+              [{confirmState.name}] AI 심층 분석 리포트를 생성하시겠습니까?
+            </p>
+            <div className="flex gap-2">
+              <button 
+                onClick={() => {
+                  onAnalyze?.(confirmState.code, confirmState.name);
+                  setConfirmState(null);
+                }}
+                className="flex-1 bg-primary text-primary-foreground text-[10px] font-black py-1.5 rounded-md hover:bg-primary/90 transition-all shadow-md active:scale-95"
+              >YES</button>
+              <button 
+                onClick={() => setConfirmState(null)}
+                className="px-3 bg-muted text-muted-foreground text-[10px] font-bold py-1.5 rounded-md hover:bg-muted/70 transition-all"
+              >NO</button>
+            </div>
+            <div className="absolute -top-2 left-4 w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-b-[8px] border-b-primary/30" />
+          </div>
+
+          {/* Mobile bottom sheet popup */}
+          <div className="md:hidden fixed z-[9999] bottom-0 left-0 right-0 bg-background/98 backdrop-blur-2xl border-t border-primary/30 rounded-t-2xl shadow-2xl p-5 animate-in slide-in-from-bottom duration-300" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 20px)' }}>
+            <div className="w-10 h-1 bg-muted-foreground/30 rounded-full mx-auto mb-4" />
+            <div className="flex items-center gap-3 mb-3">
+              <div className="p-2 bg-primary/10 rounded-lg">
+                <Bot className="w-5 h-5 text-primary" />
+              </div>
+              <span className="text-sm font-bold text-foreground">종목 분석을 할까요?</span>
+            </div>
+            <p className="text-xs font-bold text-muted-foreground mb-5">
+              [{confirmState.name}] AI 심층 분석 리포트를 생성하시겠습니까?
+            </p>
+            <div className="flex gap-3">
+              <button 
+                onClick={() => {
+                  onAnalyze?.(confirmState.code, confirmState.name);
+                  setConfirmState(null);
+                }}
+                className="flex-1 bg-primary text-primary-foreground text-sm font-black py-3 rounded-xl hover:bg-primary/90 transition-all shadow-lg shadow-primary/20 active:scale-[0.98]"
+              >AI 분석 시작</button>
+              <button 
+                onClick={() => setConfirmState(null)}
+                className="px-5 bg-muted text-muted-foreground text-sm font-bold py-3 rounded-xl hover:bg-muted/70 transition-all"
+              >취소</button>
+            </div>
+          </div>
+        </>
+      )}
+      
+      {/* Background overlay to close popup on click outside */}
+      {confirmState && (
+        <div 
+          className="fixed inset-0 z-[9998] bg-transparent" 
+          onClick={(e) => {
+            e.stopPropagation();
+            setConfirmState(null);
+          }}
+        />
+      )}
     </div>
   );
 }

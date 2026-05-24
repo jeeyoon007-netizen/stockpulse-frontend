@@ -15,6 +15,7 @@ import {
   fetchExchangeRate,
   fetchNewHighCount,
   fetchStockDetail,
+  fetchADRFromInfo,
   type MarketFundsData, 
   type CreditBalanceData, 
   type InvestorFlowData,
@@ -47,14 +48,16 @@ function setCachedData(key: string, data: any) {
  */
 export async function fetchInvestorFlowAnalysisAction(market = '0001') {
     const cacheKey = `investor_flow_${market}`;
-    const cached = getCachedData(cacheKey);
-    if (cached) return cached;
+    // const cached = getCachedData(cacheKey);
+    // if (cached) return cached;
 
     try {
+        console.log(`[ACTION] fetchInvestorRanking 호출 시작 (${market})...`);
         const [foreign, institutional] = await Promise.all([
             fetchInvestorRanking('1', market),
             fetchInvestorRanking('2', market)
         ]);
+        console.log(`[ACTION] API 응답 수신: 외인=${foreign.length}, 기관=${institutional.length}`);
 
         const foreignTop10 = foreign.slice(0, 10);
         const instTop10 = institutional.slice(0, 10);
@@ -66,13 +69,18 @@ export async function fetchInvestorFlowAnalysisAction(market = '0001') {
 
         // [순차 처리] KIS API TPS 제한을 피하기 위해 0.2초 간격으로 순차 요청
         const detailMap = new Map();
+        console.log(`[ANALYSIS] Analyzing ${uniqueCodes.length} stocks for market ${market}...`);
+        
         for (const code of uniqueCodes) {
-            const d = await fetchStockDetail(code);
+            // 주식현재가 API는 코스닥 종목도 'J' 코드를 사용해야 함
+            const d = await fetchStockDetail(code, 'J');
             if (d) detailMap.set(code, d);
             await delay(200); 
         }
 
-        const overlap = foreignTop10.filter(f => instTop10.some(i => i.code === f.code)).map(s => s.name);
+        const overlap = foreignTop10
+            .filter(f => instTop10.some(i => i.code === f.code))
+            .map(s => ({ name: s.name, code: s.code }));
 
         const industryCount: Record<string, number> = {};
         detailMap.forEach(d => {
@@ -89,17 +97,30 @@ export async function fetchInvestorFlowAnalysisAction(market = '0001') {
             .filter(([code, detail]) => {
                 const stock = [...foreignTop10, ...instTop10].find(s => s.code === code);
                 if (!stock || detail.marketCap === 0) return false;
-                const turnover = (stock.amount / detail.marketCap) * 100;
-                return turnover > 3; 
+                
+                // 단위 보정: stock.amount(원)를 억 단위로 환산하여 시총(억)과 비교
+                const amountInEok = stock.amount / 100000000;
+                const ratio = (amountInEok / detail.marketCap) * 100; // 백분율(%)
+                
+                console.log(`[ANALYSIS] ${stock.name}: 수급=${amountInEok.toFixed(1)}억 / 시총=${detail.marketCap}억 -> 비중=${ratio.toFixed(4)}%`);
+                
+                // 시장별 임계치 차별화: 코스닥은 더 엄격하게 0.5%
+                const threshold = market === '1001' ? 0.5 : 0.15;
+                return ratio > threshold;
             })
-            .map(([_, d]) => d.name);
+            .map(([code, d]) => {
+                const stock = [...foreignTop10, ...instTop10].find(s => s.code === code);
+                return { name: stock?.name || d.name || "알 수 없음", code };
+            });
+
+        console.log(`[ACTION] Final HighTurnover Results [${highTurnover.length}]: ${highTurnover.map(h => h.name).join(", ")}`);
 
         const result = {
             foreignTop10,
             instTop10,
             overlap,
             dominantIndustries,
-            highTurnover: highTurnover.slice(0, 3)
+            highTurnover
         };
 
         setCachedData(cacheKey, result);
@@ -212,26 +233,21 @@ export async function fetchCanaryDataAction() {
   const cached = getCachedData('canary_data');
   if (cached) return cached;
 
+  console.log("[ACTION] fetchCanaryDataAction 호출 시작...");
   try {
-    const [funds, creditHistory, kospiInfo, newHighCount] = await Promise.all([
+    const [funds, creditHistory, newHighCount, adrData] = await Promise.all([
       fetchMarketFunds(),
       fetchDailyCreditBalance(20),
-      fetchMajorIndex("0001", "코스피"),
-      fetchNewHighCount()
+      fetchNewHighCount(),
+      fetchADRFromInfo()
     ]);
 
-    let adr = 0;
-    let adrSignal = "데이터 부족";
-    
-    if (kospiInfo && kospiInfo.advanceCount && kospiInfo.declineCount) {
-        const adv = kospiInfo.advanceCount;
-        const dec = kospiInfo.declineCount;
-        adr = (adv / dec) * 100;
-        
-        if (adr >= 120) adrSignal = "매도 검토 (과열)";
-        else if (adr <= 80) adrSignal = "바닥권 신호 (과매도)";
-        else adrSignal = "중립";
-    }
+    console.log(`[ACTION] Canary API 결과 수신:
+      - Funds: ${funds ? "성공" : "실패(null)"}
+      - CreditHistory: ${creditHistory?.length || 0} items
+      - New High Count: ${newHighCount}
+      - ADR Data: ${adrData ? "성공" : "실패(null)"}
+    `);
 
     const highTrend = [
         { date: '4일전', count: Math.floor(newHighCount * 0.8) },
@@ -244,24 +260,24 @@ export async function fetchCanaryDataAction() {
     const result = { 
         funds, 
         creditHistory, 
-        adr: adr.toFixed(1), 
-        adrSignal,
-        advanceCount: kospiInfo?.advanceCount || 0,
-        declineCount: kospiInfo?.declineCount || 0,
+        adrKospi: adrData.kospi,
+        adrKosdaq: adrData.kosdaq,
         newHighCount,
         highTrend
     };
 
-    // 데이터가 정상적으로 수집된 경우에만 캐시 (고객예탁금 정보가 있을 때)
+    console.log(`[ACTION] Canary 최종 데이터 생성 완료: CreditHistory ${result.creditHistory.length}건`);
+
     if (funds) {
         setCachedData('canary_data', result);
     }
     return result;
-  } catch (error) {
-    console.error("fetchCanaryDataAction error:", error);
+  } catch (error: any) {
+    console.error("[ACTION] fetchCanaryDataAction 크리티컬 에러:", error.message || error);
     return { 
-        funds: null, creditHistory: [], adr: "0", adrSignal: "오류",
-        advanceCount: 0, declineCount: 0, newHighCount: 0, highTrend: []
+        funds: null, creditHistory: [], 
+        adrKospi: null, adrKosdaq: null,
+        newHighCount: 0, highTrend: []
     };
   }
 }
