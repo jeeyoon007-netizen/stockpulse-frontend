@@ -52,6 +52,24 @@ export async function fetchInvestorFlowAnalysisAction(market = '0001') {
     // const cached = getCachedData(cacheKey);
     // if (cached) return cached;
 
+    // 1. Render 백엔드 API에서 수급 데이터(뱃지 포함) 우선 수집 시도
+    try {
+        const renderBackendUrl = `https://stock-brv7.onrender.com/api/v1/market/investor-flow?market=${market}`;
+        console.log(`[ACTION] Render 백엔드 API 호출 시도: ${renderBackendUrl}`);
+        const response = await fetch(renderBackendUrl, { cache: "no-store" });
+        if (response.ok) {
+            const renderData = await response.json();
+            if (renderData && (renderData.foreignTop10 || renderData.instTop10)) {
+                console.log(`[ACTION] Render 백엔드 API에서 수급 데이터 로드 완료 (뱃지 포함)`);
+                setCachedData(cacheKey, renderData);
+                return renderData;
+            }
+        }
+    } catch (err) {
+        console.warn("[ACTION] Render 백엔드 API 호출 실패, KIS 직접 수집으로 폴백합니다:", err);
+    }
+
+    // 2. 폴백: 한국투자증권 API 직접 호출 및 자체 분석
     try {
         console.log(`[ACTION] fetchInvestorRanking 호출 시작 (${market})...`);
         const [foreign, institutional] = await Promise.all([
@@ -81,7 +99,7 @@ export async function fetchInvestorFlowAnalysisAction(market = '0001') {
 
         const overlap = foreignTop10
             .filter(f => instTop10.some(i => i.code === f.code))
-            .map(s => ({ name: s.name, code: s.code }));
+            .map(s => ({ name: s.name, code: s.code, badge: s.badge }));
 
         const industryCount: Record<string, number> = {};
         detailMap.forEach(d => {
@@ -111,7 +129,7 @@ export async function fetchInvestorFlowAnalysisAction(market = '0001') {
             })
             .map(([code, d]) => {
                 const stock = [...foreignTop10, ...instTop10].find(s => s.code === code);
-                return { name: stock?.name || d.name || "알 수 없음", code };
+                return { name: stock?.name || d.name || "알 수 없음", code, badge: stock?.badge };
             });
 
         console.log(`[ACTION] Final HighTurnover Results [${highTurnover.length}]: ${highTurnover.map(h => h.name).join(", ")}`);

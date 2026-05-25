@@ -44,8 +44,15 @@ export function InvestorFlowCard({ onAnalyze }: { onAnalyze?: (code: string, nam
                   onClick={(e) => handleStockClick(e, item.code, item.name)}
                 >
                     <div className="flex items-center gap-2 min-w-0">
-                        <span className="text-[9px] text-muted-foreground font-mono w-3">{idx + 1}</span>
-                        <span className="text-[10.5px] font-bold truncate max-w-[80px]">{item.name}</span>
+                        <span className="text-[9px] text-muted-foreground font-mono w-3 shrink-0">{idx + 1}</span>
+                        <div className="flex flex-col min-w-0">
+                            <span className="text-[10.5px] font-bold truncate max-w-[95px]">{item.name}</span>
+                            {item.badge && item.badge !== "" && (
+                                <span className="text-amber-400 text-[9px] font-bold truncate max-w-[110px] leading-tight mt-0.5" title={item.badge}>
+                                    {item.badge}
+                                </span>
+                            )}
+                        </div>
                     </div>
                     <div className="flex flex-col items-end">
                         <span className={`text-[10px] font-black ${color}`}>{formatAmount(item.amount)}</span>
@@ -108,12 +115,16 @@ export function InvestorFlowCard({ onAnalyze }: { onAnalyze?: (code: string, nam
                                 <span>양매수 동시 포착 종목</span>
                             </div>
                             <div className="flex flex-wrap gap-1.5 ">
-                                {analysis.overlap.length > 0 ? analysis.overlap.map((item: {name: string, code: string}, idx: number) => (
+                                {analysis.overlap.length > 0 ? analysis.overlap.map((item: {name: string, code: string, badge?: string}, idx: number) => (
                                     <span 
                                       key={`${item.code}-${idx}`} 
-                                      className="px-2 py-0.5 bg-stock-up/10 text-stock-up text-[10px] font-bold rounded-full border border-stock-up/20 cursor-pointer hover:bg-stock-up/20 transition-colors"
+                                      title={item.badge || "양매수 동시 포착 종목"}
+                                      className="px-2 py-0.5 bg-stock-up/10 text-stock-up text-[10px] font-bold rounded-full border border-stock-up/20 cursor-pointer hover:bg-stock-up/20 transition-all flex items-center gap-1 select-none"
                                       onClick={(e) => handleStockClick(e, item.code, item.name)}
-                                    >{item.name}</span>
+                                    >
+                                        {item.name}
+                                        {item.badge && <span className="text-[8px] opacity-80" aria-label="badge indicator">🔥</span>}
+                                    </span>
                                 )) : <span className="text-[10px] text-muted-foreground italic">포착된 종목 없음</span>}
                             </div>
                         </div>
@@ -138,12 +149,16 @@ export function InvestorFlowCard({ onAnalyze }: { onAnalyze?: (code: string, nam
                                 <span>시총 대비 수급 집중주</span>
                             </div>
                             <div className="flex flex-wrap gap-1.5 max-h-60 overflow-y-auto pr-1 thin-scrollbar">
-                                {analysis.highTurnover.length > 0 ? analysis.highTurnover.map((item: {name: string, code: string}, idx: number) => (
+                                {analysis.highTurnover.length > 0 ? analysis.highTurnover.map((item: {name: string, code: string, badge?: string}, idx: number) => (
                                     <span 
                                       key={`${item.code}-${idx}`} 
-                                      className="px-2 py-0.5 bg-amber-500/20 text-amber-300 text-[10px] font-bold rounded-full border border-amber-500/30 cursor-pointer hover:bg-amber-500/40 transition-colors"
+                                      title={item.badge || "시총 대비 수급 집중주"}
+                                      className="px-2 py-0.5 bg-amber-500/20 text-amber-300 text-[10px] font-bold rounded-full border border-amber-500/30 cursor-pointer hover:bg-amber-500/40 transition-all flex items-center gap-1 select-none"
                                       onClick={(e) => handleStockClick(e, item.code, item.name)}
-                                    >{item.name}</span>
+                                    >
+                                        {item.name}
+                                        {item.badge && <span className="text-[8px] opacity-85" aria-label="badge indicator">⚡</span>}
+                                    </span>
                                 )) : <span className="text-[10px] text-muted-foreground italic">데이터 분석 중</span>}
                             </div>
                         </div>

@@ -54,6 +54,7 @@ export interface InvestorFlowData {
   changePercent: number;
   volume: number;
   amount: number;       // 순매수 금액 (백만 단위일 수 있음)
+  badge?: string;       // N일 연속 순매수 뱃지
 }
 
 export interface IndexPriceData {

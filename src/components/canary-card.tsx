@@ -83,18 +83,43 @@ export function CanaryCard({ data }: Props) {
             </div>
 
             {/* New Highs */}
-            <div className="p-2.5 md:p-3 bg-muted/20 rounded-lg relative overflow-hidden group border-l-2 border-stock-up/30">
-              <div className="flex items-center gap-3 mb-1">
-                <div className="p-2 bg-stock-up/10 rounded-md">
-                    <TrendingUp className="w-4 h-4 text-stock-up" />
+            <div 
+              className={`p-2.5 md:p-3 bg-muted/20 rounded-lg relative overflow-hidden group border-l-2 border-stock-up/30 transition-all select-none ${
+                newHighCount >= 50 
+                  ? "shadow-[0_0_12px_rgba(244,63,94,0.15)] border-stock-up/50 bg-stock-up/[0.04]" 
+                  : newHighCount >= 20 
+                  ? "shadow-[0_0_8px_rgba(244,63,94,0.08)] border-stock-up/40 bg-stock-up/[0.02]" 
+                  : ""
+              }`}
+            >
+              {/* Subtle background pulse glow if count is high */}
+              {newHighCount >= 20 && (
+                <div className="absolute inset-0 bg-stock-up/5 animate-pulse pointer-events-none opacity-45" />
+              )}
+              
+              <div className="flex items-center justify-between mb-1 relative z-10">
+                <div className="flex items-center gap-1.5">
+                  <div className={`p-1 rounded-md shrink-0 ${newHighCount >= 20 ? 'bg-stock-up/20' : 'bg-stock-up/10'}`}>
+                      <TrendingUp className={`w-3.5 h-3.5 text-stock-up ${newHighCount >= 20 ? 'animate-bounce' : ''}`} />
+                  </div>
+                  <span className="text-[9px] md:text-[10px] text-muted-foreground line-clamp-1 font-bold">52주 신고가</span>
                 </div>
-                <span className="text-[10px] text-muted-foreground">52주 신고가</span>
               </div>
-              <div className="flex items-baseline gap-1">
-                <span className="text-base md:text-lg font-black tracking-tighter text-stock-up">
-                    {newHighCount}
+              
+              <div className="flex flex-col gap-0.5 relative z-10 mt-1">
+                <div className="flex items-baseline gap-0.5 flex-wrap">
+                  <span className="text-[11px] md:text-xs font-black text-stock-up">
+                    🏆 {newHighCount}종목
+                  </span>
+                  <span className="text-[8px] font-bold text-muted-foreground whitespace-nowrap">달성</span>
+                </div>
+                <span className="text-[7.5px] text-muted-foreground/80 leading-tight">
+                  {newHighCount >= 50 
+                    ? "🔥 극도로 강한 수급" 
+                    : newHighCount >= 20 
+                    ? "✨ 시장 활성화 국면" 
+                    : "일부 주도주 중심 견인"}
                 </span>
-                <span className="text-[8px] font-bold text-muted-foreground">종목</span>
               </div>
             </div>
         </div>
