@@ -43,8 +43,20 @@ export function CanaryCard({ data }: Props) {
     return <Minus className="w-3 h-3 text-stock-flat" />;
   };
 
+  // 신용잔고 전용: 증가 = 경고(주황), 감소 = 긍정(초록) — 방향 역전
+  const getCreditTrendIcon = (curr: number, prev: number) => {
+    if (curr > prev) return <TrendingUp className="w-3 h-3 text-amber-500" />;
+    if (curr < prev) return <TrendingDown className="w-3 h-3 text-stock-up" />;
+    return <Minus className="w-3 h-3 text-muted-foreground" />;
+  };
+
   const latestCredit = creditHistory[creditHistory.length - 1];
   const prevCredit = creditHistory[creditHistory.length - 2];
+
+  // 전일 대비 증감률 기준 경고: +0.5% 초과 시 과열 경보
+  const creditRatio = latestCredit?.ratio ?? 0;
+  const isCreditIncreasing = latestCredit && prevCredit && latestCredit.amount >= prevCredit.amount;
+  const isCreditAlert = isCreditIncreasing && creditRatio >= 0.5;
 
   const getSignalColor = (signal: string) => {
     if (signal.includes("매도")) return "text-stock-down";
@@ -125,22 +137,37 @@ export function CanaryCard({ data }: Props) {
         </div>
 
         {/* Credit Balance */}
-        <div className="p-2.5 md:p-3 bg-muted/20 rounded-lg relative overflow-hidden group">
-          <div className="flex items-center gap-3 mb-1">
-            <div className="p-2 bg-chart-5/10 rounded-md">
-                <CreditCard className="w-4 h-4 text-chart-5" />
+        <div className={`p-2.5 md:p-3 rounded-lg relative overflow-hidden group transition-all ${
+          isCreditAlert
+            ? 'bg-amber-500/[0.06] border-l-2 border-amber-500/50'
+            : 'bg-muted/20'
+        }`}>
+          {/* 과열 시 미세 배경 glow */}
+          {isCreditAlert && (
+            <div className="absolute inset-0 bg-amber-500/5 animate-pulse pointer-events-none" />
+          )}
+          <div className="flex items-center gap-3 mb-1 relative z-10">
+            <div className={`p-2 rounded-md ${isCreditAlert ? 'bg-amber-500/20' : 'bg-chart-5/10'}`}>
+                <CreditCard className={`w-4 h-4 ${isCreditAlert ? 'text-amber-400' : 'text-chart-5'}`} />
             </div>
             <span className="text-xs text-muted-foreground">신용잔고 (빚투규모)</span>
+            {isCreditAlert && (
+              <span className="ml-auto px-1.5 py-0.5 text-[8px] font-black bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-full animate-pulse">
+                ⚠️ 과열
+              </span>
+            )}
           </div>
-          <div className="flex items-baseline gap-2">
+          <div className="flex items-baseline gap-2 relative z-10">
             <span className="text-lg md:text-xl font-black tracking-tighter">
                 {latestCredit ? (latestCredit.amount / 1000000000000).toFixed(1) : "---"}
             </span>
             <span className="text-[10px] font-bold text-muted-foreground">조 원</span>
             {latestCredit && prevCredit && (
               <div className="flex items-center gap-1 ml-auto">
-                {getTrendIcon(latestCredit.amount, prevCredit.amount)}
-                <span className={`text-[10px] font-bold ${latestCredit.amount >= prevCredit.amount ? 'text-stock-up' : 'text-stock-down'}`}>
+                {getCreditTrendIcon(latestCredit.amount, prevCredit.amount)}
+                <span className={`text-[10px] font-bold ${
+                  latestCredit.amount >= prevCredit.amount ? 'text-amber-400' : 'text-stock-up'
+                }`}>
                     {latestCredit.ratio}%
                 </span>
               </div>
