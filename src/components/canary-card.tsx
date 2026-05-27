@@ -256,11 +256,11 @@ export function CanaryCard({ data }: Props) {
                 {newHighSectors.map((s, idx) => (
                   <span 
                     key={idx} 
-                    className="text-[9px] font-black px-1.5 py-0.5 rounded bg-stock-up/10 text-stock-up border border-stock-up/10 flex items-center gap-1 hover:bg-stock-up/20 transition-colors leading-none"
+                    className="text-[9px] font-bold px-2 py-1 rounded-md bg-zinc-800/80 hover:bg-zinc-800 border border-zinc-700/40 text-zinc-200 flex items-center gap-1.5 hover:border-zinc-600 transition-all leading-none shadow-sm"
                     title={`${s.sector} (${s.count}종목)`}
                   >
                     <span>{s.sector}</span>
-                    <span className="bg-stock-up/20 px-1 rounded text-[8px] font-bold">{s.count}</span>
+                    <span className="bg-rose-500/20 text-rose-400 border border-rose-500/30 px-1.5 py-0.5 rounded text-[8px] font-black">{s.count}</span>
                   </span>
                 ))}
               </div>
@@ -270,7 +270,7 @@ export function CanaryCard({ data }: Props) {
 
         {/* Bottom Row: New High Trend Mini Chart */}
         <div className="pt-2">
-            <span className="text-[9px] text-muted-foreground font-bold mb-2 block uppercase tracking-wider">신고가 5일 추이</span>
+            <span className="text-[9px] text-muted-foreground font-bold mb-2 block uppercase tracking-wider">신고가 영업일 5일간 추이</span>
             <div className="flex items-end justify-between gap-1.5 md:gap-2 h-10 md:h-12 px-1">
                 {highTrend.map((h, i) => {
                     const max = Math.max(...highTrend.map(x => x.count), 1);
