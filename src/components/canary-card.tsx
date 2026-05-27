@@ -96,6 +96,7 @@ export function CanaryCard({ data }: Props) {
       </div>
 
       <div className="space-y-4">
+        {/* Top Row Grid: Customer Deposit & Credit Balance */}
         <div className="grid grid-cols-2 gap-2 md:gap-3">
             {/* Deposit */}
             <div className="p-2.5 md:p-3 bg-muted/20 rounded-lg relative overflow-hidden group">
@@ -113,133 +114,61 @@ export function CanaryCard({ data }: Props) {
                 )}
               </div>
               <div className="flex items-baseline gap-1">
-                <span className="text-base md:text-lg font-black tracking-tighter">
+                <span className="text-base md:text-lg font-black tracking-tighter font-mono">
                     {funds ? formatMoney(Math.round(funds.deposit / 100000000)) : "---"}
                 </span>
                 <span className="text-[8px] font-bold text-muted-foreground">원</span>
               </div>
             </div>
 
-            {/* New Highs */}
-            <div 
-              className={`p-2.5 md:p-3 bg-muted/20 rounded-lg relative overflow-hidden group border-l-2 border-stock-up/30 transition-all select-none ${
-                newHighCount >= 50 
-                  ? "shadow-[0_0_12px_rgba(244,63,94,0.15)] border-stock-up/50 bg-stock-up/[0.04]" 
-                  : newHighCount >= 20 
-                  ? "shadow-[0_0_8px_rgba(244,63,94,0.08)] border-stock-up/40 bg-stock-up/[0.02]" 
-                  : ""
-              }`}
-            >
-              {/* Subtle background pulse glow if count is high */}
-              {newHighCount >= 20 && (
-                <div className="absolute inset-0 bg-stock-up/5 animate-pulse pointer-events-none opacity-45" />
+            {/* Credit Balance */}
+            <div className={`p-2.5 md:p-3 rounded-lg relative overflow-hidden group transition-all ${
+              isCreditAlert
+                ? 'bg-amber-500/[0.06] border-l-2 border-amber-500/50'
+                : 'bg-muted/20'
+            }`}>
+              {isCreditAlert && (
+                <div className="absolute inset-0 bg-amber-500/5 animate-pulse pointer-events-none" />
               )}
-              
-              <div className="flex items-center justify-between mb-1 relative z-10 gap-1">
+              <div className="flex items-center justify-between gap-1 mb-1 relative z-10">
                 <div className="flex items-center gap-1.5">
-                  <div className={`p-1 rounded-md shrink-0 ${newHighCount >= 20 ? 'bg-stock-up/20' : 'bg-stock-up/10'}`}>
-                      <TrendingUp className={`w-3.5 h-3.5 text-stock-up ${newHighCount >= 20 ? 'animate-bounce' : ''}`} />
+                  <div className={`p-1 rounded-md shrink-0 ${isCreditAlert ? 'bg-amber-500/20' : 'bg-chart-5/10'}`}>
+                      <CreditCard className={`w-3.5 h-3.5 ${isCreditAlert ? 'text-amber-400' : 'text-chart-5'}`} />
                   </div>
-                  <span className="text-[9px] md:text-[10px] text-muted-foreground line-clamp-1 font-bold">52주 신고가</span>
+                  <span className="text-[9px] md:text-[10px] text-muted-foreground font-bold">신용잔고</span>
                 </div>
-                {adrKospi?.time && (
-                  <span className="text-[8px] text-muted-foreground font-mono opacity-80 shrink-0">
-                    {getCleanDate(adrKospi.time)}
-                  </span>
-                )}
-              </div>
-              
-              <div className="flex flex-col gap-0.5 relative z-10 mt-1">
-                <div className="flex items-baseline gap-0.5 flex-wrap">
-                  <span className="text-[11px] md:text-xs font-black text-stock-up">
-                    🏆 {newHighCount}종목
-                  </span>
-                  <span className="text-[8px] font-bold text-muted-foreground whitespace-nowrap">달성</span>
-                </div>
-                <span className="text-[7.5px] text-muted-foreground/80 leading-tight">
-                  {newHighCount >= 50 
-                    ? "🔥 극도로 강한 수급" 
-                    : newHighCount >= 20 
-                    ? "✨ 시장 활성화 국면" 
-                    : "일부 주도주 중심 견인"}
-                </span>
-
-                {/* 주요 강세 업종 추가 */}
-                {newHighSectors.length > 0 && (
-                  <div className="mt-2 pt-1.5 border-t border-border/30 relative z-10 space-y-1">
-                    <span className="text-[7.5px] md:text-[8.5px] font-black text-muted-foreground/80 block uppercase tracking-wider">강세 업종 TOP 3</span>
-                    <div className="flex flex-wrap gap-1">
-                      {newHighSectors.slice(0, 3).map((s, idx) => (
-                        <span 
-                          key={idx} 
-                          className="text-[7.5px] font-black px-1 py-0.5 rounded bg-stock-up/10 text-stock-up border border-stock-up/10 truncate max-w-[85px] leading-none"
-                          title={`${s.sector} (${s.count}종목)`}
-                        >
-                          {s.sector} {s.count}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-        </div>
-
-        {/* Credit Balance */}
-        <div className={`p-2.5 md:p-3 rounded-lg relative overflow-hidden group transition-all ${
-          isCreditAlert
-            ? 'bg-amber-500/[0.06] border-l-2 border-amber-500/50'
-            : 'bg-muted/20'
-        }`}>
-          {/* 과열 시 미세 배경 glow */}
-          {isCreditAlert && (
-            <div className="absolute inset-0 bg-amber-500/5 animate-pulse pointer-events-none" />
-          )}
-          <div className="flex items-center justify-between mb-1 relative z-10">
-            <div className="flex items-center gap-3">
-              <div className={`p-2 rounded-md ${isCreditAlert ? 'bg-amber-500/20' : 'bg-chart-5/10'}`}>
-                  <CreditCard className={`w-4 h-4 ${isCreditAlert ? 'text-amber-400' : 'text-chart-5'}`} />
-              </div>
-              <span className="text-xs text-muted-foreground flex items-center gap-1.5">
-                신용잔고 (빚투규모)
                 {latestCredit?.date && (
-                  <span className="text-[8px] text-muted-foreground/80 font-mono shrink-0">
+                  <span className="text-[8px] text-muted-foreground font-mono opacity-80 shrink-0">
                     {formatDateLabel(latestCredit.date)}
                   </span>
                 )}
-              </span>
-            </div>
-            {isCreditAlert && (
-              <span className="px-1.5 py-0.5 text-[8px] font-black bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-full animate-pulse">
-                ⚠️ 과열
-              </span>
-            )}
-          </div>
-          <div className="flex items-baseline gap-2 relative z-10">
-            <span className="text-lg md:text-xl font-black tracking-tighter">
-                {latestCredit ? (latestCredit.amount / 1000000000000).toFixed(1) : "---"}
-            </span>
-            <span className="text-[10px] font-bold text-muted-foreground">조 원</span>
-            {latestCredit && prevCredit && (
-              <div className="flex items-center gap-1 ml-auto">
-                {getCreditTrendIcon(latestCredit.amount, prevCredit.amount)}
-                <span className={`text-[10px] font-bold ${
-                  latestCredit.amount >= prevCredit.amount ? 'text-amber-400' : 'text-stock-up'
-                }`}>
-                    {latestCredit.ratio}%
-                </span>
               </div>
-            )}
-          </div>
+              <div className="flex items-baseline gap-1 relative z-10 flex-wrap">
+                <span className="text-base md:text-lg font-black tracking-tighter font-mono">
+                    {latestCredit ? (latestCredit.amount / 1000000000000).toFixed(1) : "---"}
+                </span>
+                <span className="text-[8px] font-bold text-muted-foreground">조원</span>
+                {latestCredit && prevCredit && (
+                  <div className="flex items-center gap-0.5 ml-auto shrink-0 bg-background/40 px-1 py-0.5 rounded border border-border/20">
+                    {getCreditTrendIcon(latestCredit.amount, prevCredit.amount)}
+                    <span className={`text-[8px] font-bold ${
+                      latestCredit.amount >= prevCredit.amount ? 'text-amber-500' : 'text-stock-up'
+                    }`}>
+                        {latestCredit.ratio}%
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
         </div>
 
-        {/* ADR (Advance Decline Ratio) */}
+        {/* Middle Row: ADR (Advance Decline Ratio) */}
         <div className="p-2.5 md:p-3 bg-muted/20 rounded-lg relative overflow-hidden group">
           <div className="flex items-center gap-3 mb-2">
             <div className="p-2 bg-chart-2/10 rounded-md">
                 <Activity className="w-4 h-4 text-chart-2" />
             </div>
-            <span className="text-xs text-muted-foreground">ADR (등락비율)</span>
+            <span className="text-xs text-muted-foreground font-bold">ADR (등락비율)</span>
           </div>
           
           <div className="space-y-3">
@@ -250,7 +179,7 @@ export function CanaryCard({ data }: Props) {
                 <span className="text-[8px] text-muted-foreground font-mono">{adrKospi?.time || "---"}</span>
               </div>
               <div className="flex items-baseline gap-2">
-                <span className="text-sm md:text-base font-black tracking-tighter">
+                <span className="text-sm md:text-base font-black tracking-tighter font-mono">
                   {adrKospi ? Number(adrKospi.adr).toFixed(2) : "---"}%
                 </span>
                 <span className={`text-[9px] font-bold ${getSignalColor(adrKospi?.signal || "")}`}>
@@ -266,7 +195,7 @@ export function CanaryCard({ data }: Props) {
                 <span className="text-[8px] text-muted-foreground font-mono">{adrKosdaq?.time || "---"}</span>
               </div>
               <div className="flex items-baseline gap-2">
-                <span className="text-sm md:text-base font-black tracking-tighter">
+                <span className="text-sm md:text-base font-black tracking-tighter font-mono">
                   {adrKosdaq ? Number(adrKosdaq.adr).toFixed(2) : "---"}%
                 </span>
                 <span className={`text-[9px] font-bold ${getSignalColor(adrKosdaq?.signal || "")}`}>
@@ -277,7 +206,69 @@ export function CanaryCard({ data }: Props) {
           </div>
         </div>
 
-        {/* New High Trend Mini Chart */}
+        {/* 52-Week High (52주 신고가) - Moved below ADR */}
+        <div 
+          className={`p-2.5 md:p-3 bg-muted/20 rounded-lg relative overflow-hidden group border-l-2 border-stock-up/30 transition-all select-none ${
+            newHighCount >= 50 
+              ? "shadow-[0_0_12px_rgba(244,63,94,0.15)] border-stock-up/50 bg-stock-up/[0.04]" 
+              : newHighCount >= 20 
+              ? "shadow-[0_0_8px_rgba(244,63,94,0.08)] border-stock-up/40 bg-stock-up/[0.02]" 
+              : ""
+          }`}
+        >
+          {/* Subtle background pulse glow if count is high */}
+          {newHighCount >= 20 && (
+            <div className="absolute inset-0 bg-stock-up/5 animate-pulse pointer-events-none opacity-45" />
+          )}
+          
+          <div className="flex items-center justify-between mb-2 relative z-10 gap-1">
+            <div className="flex items-center gap-1.5">
+              <div className={`p-1 rounded-md shrink-0 ${newHighCount >= 20 ? 'bg-stock-up/20' : 'bg-stock-up/10'}`}>
+                  <TrendingUp className={`w-3.5 h-3.5 text-stock-up ${newHighCount >= 20 ? 'animate-bounce' : ''}`} />
+              </div>
+              <span className="text-[9px] md:text-[10px] text-muted-foreground font-bold">52주 신고가 종목 및 업종 분포</span>
+            </div>
+            {adrKospi?.time && (
+              <span className="text-[8px] text-muted-foreground font-mono opacity-80 shrink-0">
+                {getCleanDate(adrKospi.time)}
+              </span>
+            )}
+          </div>
+          
+          <div className="flex items-baseline gap-1 relative z-10 mb-3 flex-wrap">
+            <span className="text-base md:text-lg font-black text-stock-up">
+              🏆 {newHighCount}종목 달성
+            </span>
+            <span className="text-[9px] text-muted-foreground/80 font-bold whitespace-nowrap">
+              ({newHighCount >= 50 
+                ? "🔥 극도로 강한 수급" 
+                : newHighCount >= 20 
+                ? "✨ 시장 활성화 국면" 
+                : "일부 주도주 중심 견인"})
+            </span>
+          </div>
+
+          {/* 주요 강세 업종 추가 (제한 없이 전체 표시) */}
+          {newHighSectors.length > 0 && (
+            <div className="pt-2 border-t border-border/30 relative z-10 space-y-1.5">
+              <span className="text-[9px] font-bold text-muted-foreground/80 block uppercase tracking-wider font-sans">업종별 신고가 분포</span>
+              <div className="flex flex-wrap gap-1.5 max-h-[120px] overflow-y-auto pr-1">
+                {newHighSectors.map((s, idx) => (
+                  <span 
+                    key={idx} 
+                    className="text-[9px] font-black px-1.5 py-0.5 rounded bg-stock-up/10 text-stock-up border border-stock-up/10 flex items-center gap-1 hover:bg-stock-up/20 transition-colors leading-none"
+                    title={`${s.sector} (${s.count}종목)`}
+                  >
+                    <span>{s.sector}</span>
+                    <span className="bg-stock-up/20 px-1 rounded text-[8px] font-bold">{s.count}</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Bottom Row: New High Trend Mini Chart */}
         <div className="pt-2">
             <span className="text-[9px] text-muted-foreground font-bold mb-2 block uppercase tracking-wider">신고가 5일 추이</span>
             <div className="flex items-end justify-between gap-1.5 md:gap-2 h-10 md:h-12 px-1">
