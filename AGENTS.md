@@ -13,28 +13,19 @@ This version has breaking changes — APIs, conventions, and file structure may 
 ### Git 푸시 순서 (PowerShell 기준)
 
 ```powershell
-# 1. master 브랜치에 커밋
-git -C "c:\Users\jeeyo\OneDrive\바탕 화면\study\pwa" add -A
-git -C "c:\Users\jeeyo\OneDrive\바탕 화면\study\pwa" commit -m "<커밋 메시지>"
+# 1. main 브랜치에 커밋
+git -C "c:\Users\jeeyo\OneDrive\바탕 화면\study\frontend(pwa)" add -A
+git -C "c:\Users\jeeyo\OneDrive\바탕 화면\study\frontend(pwa)" commit -m "<커밋 메시지>"
 
-# 2. master 푸시 (로컬 히스토리 보존)
-git -C "c:\Users\jeeyo\OneDrive\바탕 화면\study\pwa" push origin master
-
-# 3. main 브랜치에도 강제 반영 (Vercel이 main 브랜치를 추적하기 때문에 필수!)
-git -C "c:\Users\jeeyo\OneDrive\바탕 화면\study\pwa" push origin master:main
+# 2. Vercel 배포를 위한 main 브랜치 푸시
+git -C "c:\Users\jeeyo\OneDrive\바탕 화면\study\frontend(pwa)" push origin main
 ```
-
-> **왜 `master:main`까지 해야 하나?**
-> Vercel은 `main` 브랜치를 자동 배포 트리거로 사용한다.
-> 그런데 이 프로젝트의 로컬 기본 브랜치는 `master`이므로,
-> `master`에만 푸시하면 Vercel에 반영되지 않는다.
-> `master:main` 강제 푸시를 해야 Vercel 자동 배포가 트리거된다.
 
 ## 프로젝트 배포 구조
 
 | 레포지토리 | 로컬 경로 | GitHub | 배포 플랫폼 | 추적 브랜치 |
 |---|---|---|---|---|
-| 프론트엔드 | `study/pwa` | `stockpulse-frontend` | **Vercel** | `main` |
+| 프론트엔드 | `study/frontend(pwa)` | `stockpulse-frontend` | **Vercel** | `main` |
 | 백엔드 | `study/backend` | `stockpulse-backend` | **Render** | `main` |
 
 ## 백엔드 Git 푸시 (Render)
@@ -44,6 +35,11 @@ git -C "c:\Users\jeeyo\OneDrive\바탕 화면\study\backend" add -A
 git -C "c:\Users\jeeyo\OneDrive\바탕 화면\study\backend" commit -m "<커밋 메시지>"
 git -C "c:\Users\jeeyo\OneDrive\바탕 화면\study\backend" push origin main
 ```
+
+## 🏗 아키텍처 및 역할 분담 (Architecture Guidelines)
+
+* **프론트엔드 (Next.js)**: 순수한 **View 역할**만 담당합니다. Supabase DB의 결과를 읽어오거나 가벼운 실시간 구독(Realtime)만 처리합니다. 무거운 주식 분석 로직이나 기술 지표 계산(RSI, MFI 등)을 서버 액션(`actions.ts`) 등에 구현하지 마세요.
+* **백엔드 (Express)**: **비즈니스 로직 및 분석 본체**입니다. `node-cron` 등을 활용하여 장마감 후 자동 분석, 70초 주기 실시간 데이터 갱신 및 계산을 수행하고 그 결과를 Supabase에 저장하는 역할을 전담합니다.
 
 ## 환경변수 현황 (Vercel)
 
@@ -58,7 +54,6 @@ git -C "c:\Users\jeeyo\OneDrive\바탕 화면\study\backend" push origin main
 ## 주의사항
 
 - PowerShell에서는 `&&` 연산자를 쓰지 말 것 → `;` 또는 별도 커맨드로 실행
-- `push origin master:main` 시 리모트에 이미 다른 내용이 있으면 `--force` 필요
 - 프론트엔드 서버 액션(`actions.ts`)은 `"use server"` 환경 → `NEXT_PUBLIC_` 변수가 빌드 타임에만 번들링되므로, 런타임 환경변수는 접두사 없는 `BACKEND_URL`을 사용해야 함
 - 데이터 단위: 백엔드는 원(KRW) raw 값 반환 → UI 표시 시 반드시 단위 변환 필요
   - 예탁금: `÷ 100,000,000` (억 단위 변환 후 formatMoney)
