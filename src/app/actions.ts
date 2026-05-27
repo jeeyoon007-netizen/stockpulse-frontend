@@ -384,7 +384,7 @@ export async function fetchCanaryDataAction() {
     `);
 
     // 폴백 경로에서도 Supabase에서 실제 기록 가져오기
-    let highTrend = [];
+    let highTrend: { date: string; count: number }[] = [];
     try {
       if (supabase) {
         const { data: dbHistory } = await supabase
