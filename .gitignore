@@ -45,3 +45,4 @@ market_info.py
 scratch/
 src/diagnostic-exchange-v2.ts
 src/test-market-local.ts
+monitor_supabase.js

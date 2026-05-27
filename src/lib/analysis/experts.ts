@@ -7,6 +7,9 @@ export interface ExpertOpinion {
   opinion: OpinionType;
   confidence: number; // 0 ~ 100
   reason: string;
+  vetoTriggered: boolean;
+  vetoReason?: string;
+  vetoTriggerSource?: string;
 }
 
 /**
@@ -62,6 +65,7 @@ export function evaluateTrend(data: IndicatorsResult): ExpertOpinion {
     opinion,
     confidence: Math.min(confidence, 100),
     reason: reasons.join(" "),
+    vetoTriggered: false,
   };
 }
 
@@ -110,6 +114,7 @@ export function evaluateEnergy(data: IndicatorsResult): ExpertOpinion {
     opinion,
     confidence: Math.min(confidence, 100),
     reason: reasons.join(" "),
+    vetoTriggered: false,
   };
 }
 
@@ -158,5 +163,6 @@ export function evaluateMomentum(data: IndicatorsResult): ExpertOpinion {
     opinion,
     confidence: Math.min(confidence, 100),
     reason: reasons.join(" "),
+    vetoTriggered: false,
   };
 }

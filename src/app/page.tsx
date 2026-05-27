@@ -42,6 +42,20 @@ import { CanaryCard } from "@/components/canary-card";
 import { InvestorFlowCard } from "@/components/investor-flow-card";
 import { type FearGreedResponse } from "@/lib/api/feargreed";
 import { type IndexPriceData } from "@/lib/api/kis-market";
+import { type AnalysisMode } from "@/lib/analysis/engine";
+
+const ANALYSIS_MODES = [
+  { key: "scalp",    label: "단타",  desc: "모멘텀 우선 (당일~3일)" },
+  { key: "swing",    label: "스윙",  desc: "추세 중심 (1~4주)" },
+  { key: "position", label: "장기",  desc: "구조 우선 (1개월+)" },
+] as const;
+
+const STATE_STYLES = {
+  AGGRESSIVE_LONG: { color: "text-stock-up",       bg: "bg-stock-up/10",   border: "border-stock-up/30" },
+  CAUTIOUS_LONG:   { color: "text-amber-400",       bg: "bg-amber-500/10",  border: "border-amber-500/30" },
+  HOLD:            { color: "text-muted-foreground", bg: "bg-muted/20",      border: "border-border/30" },
+  EXIT_PRIORITY:   { color: "text-stock-down",      bg: "bg-stock-down/10", border: "border-stock-down/30" },
+} as const;
 
 function DirectionIcon({ direction }: { direction: "up" | "down" | "flat" }) {
   if (direction === "up") return <TrendingUp className="w-4 h-4" />;
@@ -93,6 +107,7 @@ export default function DashboardPage() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [loadingStep, setLoadingStep] = useState(0);
   const [analysisResult, setAnalysisResult] = useState<StockAnalysisResponse | null>(null);
+  const [mode, setMode] = useState<AnalysisMode>("scalp");
 
   const filteredStocks = searchInput
     ? stocks.filter(s => s.name.includes(searchInput) || s.code.includes(searchInput)).slice(0, 6)
@@ -106,8 +121,9 @@ export default function DashboardPage() {
     "Supabase DB 저장 중..."
   ];
 
-  const handleAnalyze = async (codeToAnalyze?: string) => {
+  const handleAnalyze = async (codeToAnalyze?: string, modeToAnalyze?: AnalysisMode) => {
     const target = codeToAnalyze || stockCode || searchInput;
+    const activeMode = modeToAnalyze || mode;
     if (!target || target.length < 6) return;
     
     let finalCode = target;
@@ -131,7 +147,7 @@ export default function DashboardPage() {
     }, 1200);
 
     try {
-      const result = await analyzeStockAction(finalCode);
+      const result = await analyzeStockAction(finalCode, activeMode);
       setAnalysisResult(result);
     } catch (error) {
       console.error(error);
@@ -301,6 +317,28 @@ export default function DashboardPage() {
               <div className="space-y-6 animate-in zoom-in-95 duration-500">
                 <Separator className="bg-border/50" />
                 
+                <div className="flex bg-muted/40 p-0.5 rounded-lg text-xs font-bold border border-border/50 mb-4">
+                  {ANALYSIS_MODES.map(m => (
+                    <button
+                      key={m.key}
+                      onClick={() => {
+                        setMode(m.key);
+                        if (analysisResult?.success) {
+                          handleAnalyze(stockCode, m.key);
+                        }
+                      }}
+                      className={`flex-1 py-1.5 px-3 rounded-md transition-all ${
+                        mode === m.key
+                          ? 'bg-background text-primary shadow-sm'
+                          : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      {m.label}
+                      <span className="block text-[9px] font-normal opacity-60">{m.desc}</span>
+                    </button>
+                  ))}
+                </div>
+
                 <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
                   <div>
                     <h3 className="text-xl md:text-3xl font-black">{analysisResult.stockData.name} <span className="text-sm md:text-lg text-muted-foreground font-mono font-normal tracking-wider ml-1">({analysisResult.stockData.code})</span></h3>
@@ -313,13 +351,47 @@ export default function DashboardPage() {
                       </Badge>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-[10px] font-bold text-muted-foreground mb-1.5 uppercase tracking-widest">Expert Consensus Index</p>
-                    <Badge className={`text-sm px-4 py-1.5 flex gap-2 font-black shadow-lg ${analysisResult.analysis.finalVerdict === "상승" ? "bg-stock-up hover:bg-stock-up/90 text-white shadow-stock-up/20" : analysisResult.analysis.finalVerdict === "하락" ? "bg-stock-down hover:bg-stock-down/90 text-white shadow-stock-down/20" : "bg-stock-flat shadow-stock-flat/20"}`}>
-                       {analysisResult.analysis.finalVerdict === "상승" && <TrendingUp className="w-4 h-4" />}
-                       {analysisResult.analysis.finalVerdict === "하락" && <TrendingDown className="w-4 h-4" />}
-                       {analysisResult.analysis.finalVerdict} 의견 우세
-                    </Badge>
+                  <div className="text-right flex flex-col items-end">
+                    <p className="text-[10px] font-bold text-muted-foreground mb-1.5 uppercase tracking-widest">Market State</p>
+                    <div className={`px-4 py-2 rounded-xl border ${STATE_STYLES[analysisResult.analysis.marketState]?.bg || STATE_STYLES.HOLD.bg} ${STATE_STYLES[analysisResult.analysis.marketState]?.border || STATE_STYLES.HOLD.border} shadow-sm`}>
+                      <div className={`text-sm md:text-base font-black ${STATE_STYLES[analysisResult.analysis.marketState]?.color || STATE_STYLES.HOLD.color}`}>
+                        {analysisResult.analysis.marketStateLabel || analysisResult.analysis.finalVerdict}
+                      </div>
+                      {/* Veto 발동 시 점수 모순 설명 */}
+                      {analysisResult.analysis.marketState === "EXIT_PRIORITY" &&
+                       analysisResult.analysis.weightedScore > 0 &&
+                       analysisResult.analysis.veto?.triggered && (
+                        <div className="text-[11px] text-red-300/70 mt-0.5">
+                          ⚠️ 점수({analysisResult.analysis.weightedScore.toFixed(2)})는 긍정적이나,{' '}
+                          <span className="font-semibold text-red-300">
+                            {analysisResult.analysis.veto.source}
+                          </span>
+                          {' '}Veto로 강제 전환됨
+                        </div>
+                      )}
+                      {analysisResult.analysis.persistCycleRemaining > 0 && (
+                        <div className="text-[9px] md:text-[10px] text-muted-foreground mt-0.5 text-right font-medium">
+                          ⏱ 경보 고착 — {analysisResult.analysis.persistCycleRemaining}회 유지
+                        </div>
+                      )}
+                    </div>
+                    <div className="mt-3 text-xs text-muted-foreground flex justify-end items-center gap-2 w-full max-w-[200px]">
+                      <span>가중 점수: {analysisResult.analysis.weightedScore?.toFixed(2)}</span>
+                      <div className="w-24 h-1.5 bg-muted rounded-full overflow-hidden relative">
+                        <div className="absolute top-0 bottom-0 left-1/2 -ml-[1px] w-[2px] bg-border/80 z-10" />
+                        <div 
+                          className={`absolute top-0 bottom-0 rounded-full ${
+                            analysisResult.analysis.weightedScore > 0.4 ? 'bg-stock-up' :
+                            analysisResult.analysis.weightedScore > 0.2 ? 'bg-amber-400' :
+                            analysisResult.analysis.weightedScore < -0.2 ? 'bg-stock-down' : 'bg-muted-foreground'
+                          }`}
+                          style={{
+                            left: analysisResult.analysis.weightedScore < 0 ? `${50 + analysisResult.analysis.weightedScore * 50}%` : '50%',
+                            width: `${Math.abs(analysisResult.analysis.weightedScore) * 50}%`
+                          }}
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -329,13 +401,27 @@ export default function DashboardPage() {
                   </div>
                 )}
 
+                {analysisResult.analysis.veto?.triggered && (
+                  <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-xs font-bold text-red-400 animate-in fade-in">
+                    <span className="text-base shrink-0">🚨</span>
+                    <div>
+                      <div className="font-black">Veto 발동 — {analysisResult.analysis.veto.priority} 경보</div>
+                      <div className="font-normal text-red-300/80 mt-0.5">{analysisResult.analysis.veto.reason}</div>
+                      <div className="font-mono text-[10px] text-red-400/60 mt-0.5">트리거: {analysisResult.analysis.veto.source}</div>
+                    </div>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {analysisResult.analysis.experts.map((exp, idx) => (
                     <div key={idx} className="bg-background/80 rounded-xl p-4 border border-border/50 shadow-sm relative overflow-hidden group hover:scale-[1.02] transition-transform duration-300">
                       <div className={`absolute top-0 right-0 w-1.5 h-full ${directionColor(exp.opinion).replace('text-', 'bg-')} opacity-30`}/>
                       <h4 className="font-bold text-sm flex justify-between items-center mb-2">
                         {exp.expertName}
-                        <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${directionColor(exp.opinion).replace('text-', 'bg-')}/10 ${directionColor(exp.opinion)}`}>{exp.opinion}</span>
+                        <div className="flex items-center gap-1.5">
+                          {exp.vetoTriggered && <span title={exp.vetoReason} className="text-base leading-none">⚠️</span>}
+                          <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${directionColor(exp.opinion).replace('text-', 'bg-')}/10 ${directionColor(exp.opinion)}`}>{exp.opinion}</span>
+                        </div>
                       </h4>
                       <div className="flex items-center gap-2 mb-3">
                           <Progress value={exp.confidence} className="h-1 flex-1 bg-secondary" />
@@ -355,7 +441,7 @@ export default function DashboardPage() {
                     <ScrollArea className="flex-1 p-4">
                       <div className="space-y-4">
                          {analysisResult.analysis.auditLogs.map((log, idx) => (
-                           <div key={idx} className="flex gap-3 items-start">
+                           <div key={idx} className={`flex gap-3 items-start ${log.vetoTriggered ? 'bg-red-500/10 p-2.5 rounded-lg border border-red-500/20' : ''}`}>
                               <div className="shrink-0 w-6 h-6 rounded-lg bg-primary/10 flex items-center justify-center text-[10px] font-black text-primary border border-primary/20 mt-1">
                                 {log.step}
                               </div>

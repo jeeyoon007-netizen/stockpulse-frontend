@@ -1,7 +1,7 @@
 "use server";
 
 import { fetchStockOHLCV, AnalysisError } from "@/lib/api/kis";
-import { runAnalysisEngine, type AIAnalysisResult } from "@/lib/analysis/engine";
+import { runAnalysisEngine, type AIAnalysisResult, type AnalysisMode } from "@/lib/analysis/engine";
 import { supabase } from "@/lib/supabase";
 
 import { fetchFearGreedIndex, type FearGreedResponse } from "@/lib/api/feargreed";
@@ -208,10 +208,37 @@ export async function fetchMarketOverviewAction(): Promise<IndexPriceData[]> {
   }
 }
 
-export async function analyzeStockAction(code: string): Promise<StockAnalysisResponse> {
+export async function analyzeStockAction(code: string, mode: AnalysisMode = "scalp"): Promise<StockAnalysisResponse> {
   try {
     const stockData = await fetchStockOHLCV(code, 240);
-    const result = runAnalysisEngine(stockData.ohlcv);
+    
+    let prevPersistCycle = 0;
+    let cooldownActive = false;
+    if (supabase) {
+        const { data: prev } = await supabase
+            .from('analysis_states')
+            .select('market_state, persist_cycle_remaining, analyzed_at')
+            .eq('stock_code', code)
+            .order('analyzed_at', { ascending: false })
+            .limit(1)
+            .single();
+
+        if (prev?.persist_cycle_remaining && prev.persist_cycle_remaining > 0) {
+            // 최소 냉각 기간: 마지막 분석으로부터 5분 미경과 시 차감하지 않음
+            const elapsed = Date.now() - new Date(prev.analyzed_at).getTime();
+            const MIN_COOLDOWN_MS = 5 * 60 * 1000; // 5분
+            if (elapsed < MIN_COOLDOWN_MS) {
+                // 시간 부족 → persist_cycle을 +1 보정하여 engine 내부 -1과 상쇄 (차감 방지)
+                prevPersistCycle = prev.persist_cycle_remaining + 1;
+                cooldownActive = true;
+                console.log(`[ACTION] persist_cycle 냉각 활성 (${Math.floor(elapsed/1000)}s < 300s), 차감 억제`);
+            } else {
+                prevPersistCycle = prev.persist_cycle_remaining;
+            }
+        }
+    }
+
+    const result = runAnalysisEngine(stockData.ohlcv, mode, prevPersistCycle);
 
     if (supabase) {
         const { error: dbError } = await supabase.from('analysis_logs').insert({
@@ -223,8 +250,18 @@ export async function analyzeStockAction(code: string): Promise<StockAnalysisRes
             experts_opinion: result.experts
         });
 
-        if (dbError) {
-            console.error("분석 결과 DB 저장 실패:", dbError.message);
+        const { error: stateError } = await supabase.from('analysis_states').insert({
+            stock_code: code,
+            market_state: result.marketState,
+            mode,
+            weighted_score: result.weightedScore,
+            veto_triggered: result.veto.triggered,
+            veto_source: result.veto.source || null,
+            persist_cycle_remaining: result.persistCycleRemaining,
+        });
+
+        if (dbError || stateError) {
+            console.error("분석 결과 DB 저장 실패:", (dbError || stateError)?.message);
         }
     } else {
         console.info("Supabase 미설정으로 로그 저장을 건너뜁니다.");

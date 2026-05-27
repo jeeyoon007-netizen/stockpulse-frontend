@@ -17,6 +17,8 @@ export interface IndicatorsResult {
   lastLow: number;
   recentHigh: number; // 최근 60일내 최고가
   recentLow: number;  // 최근 60일내 최저가
+  rsiHistory: number[];  // 최근 5개 RSI (히스테리시스 판단용)
+  adxHistory: number[];  // 최근 5개 ADX
 }
 
 /**
@@ -77,6 +79,9 @@ export function calculateIndicators(ohlcvs: OHLCV[]): IndicatorsResult {
 
   const lastADX = last(adxArr) || { adx: 0, pdi: 0, mdi: 0 };
 
+  const rsiHistory = rsiArr.slice(-5);
+  const adxHistory = adxArr.slice(-5).map(v => v.adx || 0);
+
   return {
     sma5: last(sma5Arr) || 0,
     sma20: last(sma20Arr) || 0,
@@ -93,5 +98,7 @@ export function calculateIndicators(ohlcvs: OHLCV[]): IndicatorsResult {
     lastLow: last(lows),
     recentHigh,
     recentLow,
+    rsiHistory,
+    adxHistory,
   };
 }

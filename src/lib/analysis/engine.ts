@@ -7,10 +7,41 @@ import {
   type OpinionType,
 } from "./experts";
 
+export const WEIGHT_PROFILES = {
+  scalp:    { trend: 0.20, energy: 0.30, momentum: 0.50 }, // 단타: 모멘텀 최우선
+  swing:    { trend: 0.40, energy: 0.35, momentum: 0.25 }, // 스윙: 추세 중심
+  position: { trend: 0.55, energy: 0.30, momentum: 0.15 }, // 장기: 구조 우선
+} as const;
+
+export type AnalysisMode = keyof typeof WEIGHT_PROFILES;
+
+export type MarketState =
+  | "AGGRESSIVE_LONG"
+  | "CAUTIOUS_LONG"
+  | "HOLD"
+  | "EXIT_PRIORITY";
+
+export const MARKET_STATE_LABELS: Record<MarketState, string> = {
+  AGGRESSIVE_LONG: "🚀 강세 추세 진행 중",
+  CAUTIOUS_LONG:   "⚡ 상승 과열 주의",
+  HOLD:            "🔍 방향 탐색 중",
+  EXIT_PRIORITY:   "🚨 탈출 우선 경보",
+};
+
 export interface AuditLog {
   step: number;
   expertName: string;
   message: string;
+  vetoTriggered?: boolean;
+  vetoSource?: string;
+}
+
+export interface VetoResult {
+  triggered: boolean;
+  priority: 'P1' | 'P2' | null;
+  reason: string;
+  source: string;
+  forcedState: 'EXIT_PRIORITY' | 'HOLD' | null;
 }
 
 export interface StrategyScenario {
@@ -26,13 +57,68 @@ export interface AIAnalysisResult {
   auditLogs: AuditLog[];
   strategy: StrategyScenario;
   finalVerdict: OpinionType;
+  weightedScore: number;
+  mode: AnalysisMode;
+  veto: VetoResult;
+  marketState: MarketState;
+  marketStateLabel: string;
+  persistCycleRemaining: number;
+}
+
+type WeightProfile = { trend: number; energy: number; momentum: number };
+
+function checkVeto(data: IndicatorsResult): VetoResult {
+  // ===== 상방 Veto: 극단적 과매도 구간 방어 =====
+  // RSI ≤ 20이고 MFI ≤ 15면 과매도 극단 → P1 하방 Veto 억제, HOLD 강제
+  if (data.rsi <= 20 && data.mfi <= 15) {
+    return {
+      triggered: true, priority: 'P2',
+      reason: `RSI(${data.rsi.toFixed(1)})+MFI(${data.mfi.toFixed(1)}) 극단적 과매도 — 추가 하락 경보 억제`,
+      source: `상방Veto: RSI=${data.rsi.toFixed(1)}, MFI=${data.mfi.toFixed(1)}`,
+      forcedState: 'HOLD'
+    };
+  }
+
+  // 시장 국면별 RSI 임계값 동적 조정
+  // 강세 추세(ADX≥30 + 정배열)에서는 RSI 허용 범위를 85로 완화
+  const isStrongUptrend = data.adx >= 30 && data.sma5 > data.sma20 && data.sma20 > data.sma60;
+  const rsiThreshold = isStrongUptrend ? 85 : 78;
+  if (data.rsi > rsiThreshold) return {
+    triggered: true, priority: 'P1',
+    reason: `RSI(${data.rsi.toFixed(1)}) ${rsiThreshold} 초과 — Veto 발동${isStrongUptrend ? ' (강세장 완화 적용)' : ''}`,
+    source: `RSI=${data.rsi.toFixed(1)}`,
+    forcedState: 'EXIT_PRIORITY'
+  };
+  if (data.mfi > 85 && data.lastClose < data.vwap) return {
+    triggered: true, priority: 'P1',
+    reason: `MFI(${data.mfi.toFixed(1)}) 과매수 + VWAP 하방 이탈 — 대량 분배 경고 (${data.lastClose} < VWAP ${data.vwap.toFixed(0)})`,
+    source: `MFI=${data.mfi.toFixed(1)}, VWAP↓(${data.lastClose}<${data.vwap.toFixed(0)})`,
+    forcedState: 'EXIT_PRIORITY'
+  };
+  if (data.lastClose < data.sma60) return {
+    triggered: true, priority: 'P1',
+    reason: `SMA60 하방 이탈 — 추세 구조 붕괴`,
+    source: `SMA60 이탈 (${data.lastClose} < ${data.sma60.toFixed(0)})`,
+    forcedState: 'EXIT_PRIORITY'
+  };
+  if (data.adx < 15) return {
+    triggered: true, priority: 'P2',
+    reason: `ADX(${data.adx.toFixed(1)}) 15 미만 — 추세 소멸`,
+    source: `ADX=${data.adx.toFixed(1)}`,
+    forcedState: 'HOLD'
+  };
+  return { triggered: false, priority: null, reason: "", source: "", forcedState: null };
 }
 
 /**
  * 3인의 의견을 교차 검증(CrossCheck)하여 상호 반박 및 Audit Log를 생성합니다.
  */
-function crossCheck(experts: ExpertOpinion[]): {
+function crossCheck(
+  experts: ExpertOpinion[],
+  weights: WeightProfile
+): {
   logs: AuditLog[];
+  weightedScore: number;
   verdict: OpinionType;
 } {
   const logs: AuditLog[] = [];
@@ -41,13 +127,17 @@ function crossCheck(experts: ExpertOpinion[]): {
   const energy = experts.find((e) => e.expertName.includes("에너지"))!;
   const momentum = experts.find((e) => e.expertName.includes("모멘텀"))!;
 
-  let upVotes = 0;
-  let downVotes = 0;
-  
-  experts.forEach((e) => {
-    if (e.opinion === "상승") upVotes++;
-    else if (e.opinion === "하락") downVotes++;
-  });
+  const toScore = (op: OpinionType) =>
+    op === "상승" ? 1 : op === "하락" ? -1 : 0;
+
+  const weightedScore =
+    toScore(trend.opinion)    * weights.trend    * (trend.confidence / 100) +
+    toScore(energy.opinion)   * weights.energy   * (energy.confidence / 100) +
+    toScore(momentum.opinion) * weights.momentum * (momentum.confidence / 100);
+
+  const verdict: OpinionType =
+    weightedScore > 0.2  ? "상승" :
+    weightedScore < -0.2 ? "하락" : "횡보/보합";
 
   // 1단계: 논리적 충돌 탐지
   if (trend.opinion === "상승" && momentum.opinion === "하락") {
@@ -62,32 +152,28 @@ function crossCheck(experts: ExpertOpinion[]): {
       expertName: energy.expertName,
       message: `전반적인 추세는 [하락]이나, 바닥권에서 스마트머니(MFI) 또는 거래량 가중평균(VWAP)을 상회하는 강력한 수급이 감지되어 반등을 시도 중입니다.`,
     });
-  } else if (upVotes === 3 || downVotes === 3) {
+  } else if (trend.opinion === energy.opinion && energy.opinion === momentum.opinion && trend.opinion !== "횡보/보합") {
     logs.push({
       step: 1,
       expertName: "System",
-      message: `세 전문가의 방향성이 완벽히 일치합니다. [${upVotes === 3 ? "상승" : "하락"}] 추세가 고착화되었습니다.`,
+      message: `세 전문가의 방향성이 완벽히 일치합니다. [${trend.opinion}] 추세가 고착화되었습니다.`,
     });
   } else {
     logs.push({
       step: 1,
       expertName: "System",
-      message: `전문가 간 혼조세 속 다수결에 따른 기본 방향성을 탐색 중입니다.`,
+      message: `전문가 간 혼조세 속 가중치 점수에 기반한 기본 방향성을 탐색 중입니다.`,
     });
   }
 
   // 2단계: 최종 합의
-  let verdict: OpinionType = "횡보/보합";
-  if (upVotes >= 2) verdict = "상승";
-  else if (downVotes >= 2) verdict = "하락";
-
   logs.push({
     step: 2,
     expertName: "총괄 AI",
-    message: `전문가 의견 종합 결과, 3인 중 상승 ${upVotes}명, 하락 ${downVotes}명으로 최종 방향성은 [${verdict}]을 향하고 있습니다.`,
+    message: `가중치 분석 결과 (모멘텀 ${weights.momentum * 100}%, 추세 ${weights.trend * 100}%, 에너지 ${weights.energy * 100}%), 최종 점수는 ${weightedScore.toFixed(2)}점이며 방향성은 [${verdict}]을 향하고 있습니다.`,
   });
 
-  return { logs, verdict };
+  return { logs, weightedScore, verdict };
 }
 
 /**
@@ -128,10 +214,57 @@ function calculateStrategy(data: IndicatorsResult): StrategyScenario {
   };
 }
 
+export function classifyMarketState(
+  weightedScore: number,
+  veto: VetoResult,
+  data: IndicatorsResult,
+  prevPersistCycle: number
+): { state: MarketState; persistCycleRemaining: number } {
+  // P1 Veto: 강제 EXIT_PRIORITY + 신호 고착 2사이클 설정
+  if (veto.triggered && veto.priority === 'P1') {
+    return { state: "EXIT_PRIORITY", persistCycleRemaining: 2 };
+  }
+
+  // 신호 고착 유지: 이전 사이클 잔여가 남아있으면 EXIT_PRIORITY 유지
+  if (prevPersistCycle > 0) {
+    // 조기 해제 조건: RSI 40 이하 반등 + VWAP 상회 + 정배열 회복
+    const isRecovering = data.rsi < 40 && data.lastClose > data.vwap &&
+                          data.sma5 > data.sma20;
+    if (isRecovering) {
+      // 반등 시그널이 강하면 고착을 즉시 해제
+      return { state: "HOLD", persistCycleRemaining: 0 };
+    }
+    return { state: "EXIT_PRIORITY", persistCycleRemaining: prevPersistCycle - 1 };
+  }
+
+  // P2 Veto: 추세 약하면 HOLD 강제
+  if (veto.triggered && veto.priority === 'P2' && Math.abs(weightedScore) < 0.6) {
+    return { state: "HOLD", persistCycleRemaining: 0 };
+  }
+
+  // 히스테리시스: 최근 5개 RSI 모두 임계값 초과해야 과열 인정
+  const rsiConsistentlyHigh = data.rsiHistory.every(r => r > 65);
+
+  if (weightedScore > 0.4 && data.rsi >= 50 && data.rsi <= 65 && data.adx >= 25) {
+    return { state: "AGGRESSIVE_LONG", persistCycleRemaining: 0 };
+  }
+  if (weightedScore > 0.2 && (rsiConsistentlyHigh || data.mfi > 70)) {
+    return { state: "CAUTIOUS_LONG", persistCycleRemaining: 0 };
+  }
+  if (Math.abs(weightedScore) <= 0.2 || data.adx < 20) {
+    return { state: "HOLD", persistCycleRemaining: 0 };
+  }
+  return { state: "EXIT_PRIORITY", persistCycleRemaining: 2 };
+}
+
 /**
  * 입체 주식 분석 엔진 메인 오케스트레이션 함수
  */
-export function runAnalysisEngine(ohlcvs: any[]): AIAnalysisResult {
+export function runAnalysisEngine(
+  ohlcvs: any[],
+  mode: AnalysisMode = "scalp",
+  prevPersistCycle = 0
+): AIAnalysisResult {
   // 1. 기초 지표 계산
   const data = calculateIndicators(ohlcvs);
 
@@ -142,15 +275,61 @@ export function runAnalysisEngine(ohlcvs: any[]): AIAnalysisResult {
   const experts = [tExpert, eExpert, mExpert];
 
   // 3. 상호 반박 및 교차 검증 (Audit Logs)
-  const { logs, verdict } = crossCheck(experts);
+  const weights = WEIGHT_PROFILES[mode];
+  const { logs, weightedScore, verdict } = crossCheck(experts, weights);
+
+  // Phase 2: Veto Check
+  const veto = checkVeto(data);
+  let finalVerdict = verdict;
+
+  if (veto.triggered) {
+    logs.push({
+      step: 3,
+      expertName: "System",
+      message: veto.reason,
+      vetoTriggered: true,
+      vetoSource: veto.source,
+    });
+    
+    if (veto.priority === 'P1') {
+      finalVerdict = "하락";
+    } else if (veto.priority === 'P2' && Math.abs(weightedScore) < 0.6) {
+      finalVerdict = "횡보/보합";
+    }
+
+    let targetExpertName = "";
+    if (veto.source.includes("RSI")) targetExpertName = "모멘텀 전문가";
+    else if (veto.source.includes("MFI")) targetExpertName = "에너지 전문가";
+    else if (veto.source.includes("SMA60") || veto.source.includes("ADX")) targetExpertName = "파동/추세 전문가";
+    
+    const targetExpert = experts.find(e => e.expertName === targetExpertName);
+    if (targetExpert) {
+      targetExpert.vetoTriggered = true;
+      targetExpert.vetoReason = veto.reason;
+      targetExpert.vetoTriggerSource = veto.source;
+    }
+  }
 
   // 4. 전략(시나리오) 산출
   const strategy = calculateStrategy(data);
+
+  const { state: marketState, persistCycleRemaining } = classifyMarketState(
+    weightedScore,
+    veto,
+    data,
+    prevPersistCycle
+  );
 
   return {
     experts,
     auditLogs: logs,
     strategy,
-    finalVerdict: verdict,
+    finalVerdict,
+    weightedScore,
+    mode,
+    veto,
+    marketState,
+    marketStateLabel: MARKET_STATE_LABELS[marketState],
+    persistCycleRemaining,
   };
 }
