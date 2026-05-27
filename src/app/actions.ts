@@ -324,13 +324,39 @@ export async function fetchCanaryDataAction() {
     if (res.ok) {
       const data = await res.json();
       if (data && data.newHighCount !== undefined) {
-        data.highTrend = [
-            { date: '4일전', count: Math.floor(data.newHighCount * 0.8) },
-            { date: '3일전', count: Math.floor(data.newHighCount * 1.1) },
-            { date: '2일전', count: Math.floor(data.newHighCount * 0.9) },
-            { date: '1일전', count: Math.floor(data.newHighCount * 0.7) },
-            { date: '오늘', count: data.newHighCount },
-        ];
+        try {
+          // 1. Supabase에서 최근 5영업일 데이터 조회
+          const { data: dbHistory } = await supabase
+            .from('market_new_highs_history')
+            .select('trade_date, new_high_count')
+            .order('trade_date', { ascending: false })
+            .limit(5);
+
+          // 2. 과거 -> 최신 순으로 뒤집고 차트 데이터 규격에 매핑
+          let highTrend = dbHistory && dbHistory.length > 0
+            ? dbHistory.map(row => {
+                const [_, m, d] = row.trade_date.split('-');
+                return {
+                  date: `${parseInt(m)}/${parseInt(d)}`,
+                  count: row.new_high_count
+                };
+              }).reverse()
+            : [];
+
+          // 데이터가 부족하면 최소한 오늘 수치라도 노출
+          if (highTrend.length === 0) {
+            highTrend = [
+              { date: '오늘', count: data.newHighCount }
+            ];
+          }
+
+          data.highTrend = highTrend; // 대입 누락 수정
+        } catch (dbErr) {
+          console.warn("[ACTION] Supabase history fetch failed, fallback to today count:", dbErr);
+          data.highTrend = [
+            { date: '오늘', count: data.newHighCount }
+          ];
+        }
       }
       console.log("[ACTION] [BRIDGE] 백엔드로부터 카나리아 데이터 로드 성공");
       setCachedData('canary_data', data);
@@ -356,13 +382,35 @@ export async function fetchCanaryDataAction() {
       - ADR Data: ${adrData ? "성공" : "실패(null)"}
     `);
 
-    const highTrend = [
-        { date: '4일전', count: Math.floor(newHighCount * 0.8) },
-        { date: '3일전', count: Math.floor(newHighCount * 1.1) },
-        { date: '2일전', count: Math.floor(newHighCount * 0.9) },
-        { date: '1일전', count: Math.floor(newHighCount * 0.7) },
-        { date: '오늘', count: newHighCount },
-    ];
+    // 폴백 경로에서도 Supabase에서 실제 기록 가져오기
+    let highTrend = [];
+    try {
+      if (supabase) {
+        const { data: dbHistory } = await supabase
+          .from('market_new_highs_history')
+          .select('trade_date, new_high_count')
+          .order('trade_date', { ascending: false })
+          .limit(5);
+
+        if (dbHistory && dbHistory.length > 0) {
+          highTrend = dbHistory.map(row => {
+            const [_, m, d] = row.trade_date.split('-');
+            return {
+              date: `${parseInt(m)}/${parseInt(d)}`,
+              count: row.new_high_count
+            };
+          }).reverse();
+        }
+      }
+    } catch (e) {
+      console.warn("Fallback path Supabase query failed:", e);
+    }
+
+    if (highTrend.length === 0) {
+      highTrend = [
+        { date: '오늘', count: newHighCount }
+      ];
+    }
 
     const result = { 
         funds, 
