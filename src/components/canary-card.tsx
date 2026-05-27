@@ -50,6 +50,24 @@ export function CanaryCard({ data }: Props) {
     return <Minus className="w-3 h-3 text-muted-foreground" />;
   };
 
+  // YYYYMMDD -> M/D 포맷 도우미 (예: 20260526 -> 5/26)
+  const formatDateLabel = (dateStr?: string) => {
+    if (!dateStr || dateStr.length !== 8) return "";
+    const month = parseInt(dateStr.substring(4, 6));
+    const day = parseInt(dateStr.substring(6, 8));
+    return `(${month}/${day} 기준)`;
+  };
+
+  // YYYY-MM-DD -> M/D 포맷 도우미 (예: 2026-05-27 (15:30) -> 5/27)
+  const getCleanDate = (timeStr?: string) => {
+    if (!timeStr) return "";
+    const match = timeStr.match(/(\d{4})-(\d{2})-(\d{2})/);
+    if (match) {
+      return `(${parseInt(match[2])}/${parseInt(match[3])} 기준)`;
+    }
+    return "";
+  };
+
   const latestCredit = creditHistory[creditHistory.length - 1];
   const prevCredit = creditHistory[creditHistory.length - 2];
 
@@ -71,8 +89,8 @@ export function CanaryCard({ data }: Props) {
             <span className="w-2 h-2 rounded-full bg-chart-3 animate-pulse"></span>
             카나리아 (시장 자금 & 심리)
         </h3>
-        <span className="text-[10px] text-muted-foreground font-mono">
-            {funds?.date || latestCredit?.date}
+        <span className="text-[9px] text-muted-foreground/80 font-mono bg-muted/30 border border-border/30 px-2 py-0.5 rounded shadow-sm">
+            실시간 모니터링 중
         </span>
       </div>
 
@@ -80,11 +98,18 @@ export function CanaryCard({ data }: Props) {
         <div className="grid grid-cols-2 gap-2 md:gap-3">
             {/* Deposit */}
             <div className="p-2.5 md:p-3 bg-muted/20 rounded-lg relative overflow-hidden group">
-              <div className="flex items-center gap-3 mb-1">
-                <div className="p-2 bg-chart-1/10 rounded-md">
-                    <Wallet className="w-4 h-4 text-chart-1" />
+              <div className="flex items-center justify-between gap-1 mb-1">
+                <div className="flex items-center gap-1.5">
+                  <div className="p-1 bg-chart-1/10 rounded-md shrink-0">
+                      <Wallet className="w-3.5 h-3.5 text-chart-1" />
+                  </div>
+                  <span className="text-[9px] md:text-[10px] text-muted-foreground font-bold">고객예탁금</span>
                 </div>
-                <span className="text-[10px] text-muted-foreground">고객예탁금</span>
+                {funds?.date && (
+                  <span className="text-[8px] text-muted-foreground font-mono opacity-80 shrink-0">
+                    {formatDateLabel(funds.date)}
+                  </span>
+                )}
               </div>
               <div className="flex items-baseline gap-1">
                 <span className="text-base md:text-lg font-black tracking-tighter">
@@ -109,13 +134,18 @@ export function CanaryCard({ data }: Props) {
                 <div className="absolute inset-0 bg-stock-up/5 animate-pulse pointer-events-none opacity-45" />
               )}
               
-              <div className="flex items-center justify-between mb-1 relative z-10">
+              <div className="flex items-center justify-between mb-1 relative z-10 gap-1">
                 <div className="flex items-center gap-1.5">
                   <div className={`p-1 rounded-md shrink-0 ${newHighCount >= 20 ? 'bg-stock-up/20' : 'bg-stock-up/10'}`}>
                       <TrendingUp className={`w-3.5 h-3.5 text-stock-up ${newHighCount >= 20 ? 'animate-bounce' : ''}`} />
                   </div>
                   <span className="text-[9px] md:text-[10px] text-muted-foreground line-clamp-1 font-bold">52주 신고가</span>
                 </div>
+                {adrKospi?.time && (
+                  <span className="text-[8px] text-muted-foreground font-mono opacity-80 shrink-0">
+                    {getCleanDate(adrKospi.time)}
+                  </span>
+                )}
               </div>
               
               <div className="flex flex-col gap-0.5 relative z-10 mt-1">
@@ -146,13 +176,22 @@ export function CanaryCard({ data }: Props) {
           {isCreditAlert && (
             <div className="absolute inset-0 bg-amber-500/5 animate-pulse pointer-events-none" />
           )}
-          <div className="flex items-center gap-3 mb-1 relative z-10">
-            <div className={`p-2 rounded-md ${isCreditAlert ? 'bg-amber-500/20' : 'bg-chart-5/10'}`}>
-                <CreditCard className={`w-4 h-4 ${isCreditAlert ? 'text-amber-400' : 'text-chart-5'}`} />
+          <div className="flex items-center justify-between mb-1 relative z-10">
+            <div className="flex items-center gap-3">
+              <div className={`p-2 rounded-md ${isCreditAlert ? 'bg-amber-500/20' : 'bg-chart-5/10'}`}>
+                  <CreditCard className={`w-4 h-4 ${isCreditAlert ? 'text-amber-400' : 'text-chart-5'}`} />
+              </div>
+              <span className="text-xs text-muted-foreground flex items-center gap-1.5">
+                신용잔고 (빚투규모)
+                {latestCredit?.date && (
+                  <span className="text-[8px] text-muted-foreground/80 font-mono shrink-0">
+                    {formatDateLabel(latestCredit.date)}
+                  </span>
+                )}
+              </span>
             </div>
-            <span className="text-xs text-muted-foreground">신용잔고 (빚투규모)</span>
             {isCreditAlert && (
-              <span className="ml-auto px-1.5 py-0.5 text-[8px] font-black bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-full animate-pulse">
+              <span className="px-1.5 py-0.5 text-[8px] font-black bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-full animate-pulse">
                 ⚠️ 과열
               </span>
             )}
