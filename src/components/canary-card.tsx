@@ -19,12 +19,13 @@ interface Props {
       signal: string;
     } | null;
     newHighCount?: number;
+    newHighSectors?: { sector: string; count: number }[];
     highTrend?: { date: string, count: number }[];
   };
 }
 
 export function CanaryCard({ data }: Props) {
-  const { funds, creditHistory, adrKospi, adrKosdaq, newHighCount = 0, highTrend = [] } = data;
+  const { funds, creditHistory, adrKospi, adrKosdaq, newHighCount = 0, newHighSectors = [], highTrend = [] } = data;
   
   // Format Large Money (KRW 억/조)
   const formatMoney = (val: number) => {
@@ -162,6 +163,24 @@ export function CanaryCard({ data }: Props) {
                     ? "✨ 시장 활성화 국면" 
                     : "일부 주도주 중심 견인"}
                 </span>
+
+                {/* 주요 강세 업종 추가 */}
+                {newHighSectors.length > 0 && (
+                  <div className="mt-2 pt-1.5 border-t border-border/30 relative z-10 space-y-1">
+                    <span className="text-[7.5px] md:text-[8.5px] font-black text-muted-foreground/80 block uppercase tracking-wider">강세 업종 TOP 3</span>
+                    <div className="flex flex-wrap gap-1">
+                      {newHighSectors.slice(0, 3).map((s, idx) => (
+                        <span 
+                          key={idx} 
+                          className="text-[7.5px] font-black px-1 py-0.5 rounded bg-stock-up/10 text-stock-up border border-stock-up/10 truncate max-w-[85px] leading-none"
+                          title={`${s.sector} (${s.count}종목)`}
+                        >
+                          {s.sector} {s.count}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
         </div>
