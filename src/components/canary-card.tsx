@@ -235,11 +235,12 @@ export function CanaryCard({ data }: Props) {
             )}
           </div>
           
-          <div className="flex items-baseline gap-1 relative z-10 mb-3 flex-wrap">
-            <span className="text-base md:text-lg font-black text-stock-up">
-              🏆 {newHighCount}종목 달성
+          <div className="flex items-baseline gap-1 relative z-10 mb-3 flex-wrap font-mono">
+            <span className="text-base md:text-lg font-black text-zinc-100 tracking-tighter">
+              🏆 {newHighCount}
             </span>
-            <span className="text-[9px] text-muted-foreground/80 font-bold whitespace-nowrap">
+            <span className="text-[10px] font-bold text-zinc-400 ml-0.5">종목 달성</span>
+            <span className="text-[9px] text-zinc-500 font-bold whitespace-nowrap ml-2 font-sans">
               ({newHighCount >= 50 
                 ? "🔥 극도로 강한 수급" 
                 : newHighCount >= 20 
@@ -260,7 +261,7 @@ export function CanaryCard({ data }: Props) {
                     title={`${s.sector} (${s.count}종목)`}
                   >
                     <span>{s.sector}</span>
-                    <span className="bg-rose-500/20 text-rose-400 border border-rose-500/30 px-1.5 py-0.5 rounded text-[8px] font-black">{s.count}</span>
+                    <span className="bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.5 rounded text-[8px] font-black font-mono">{s.count}</span>
                   </span>
                 ))}
               </div>
