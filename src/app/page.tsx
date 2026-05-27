@@ -34,7 +34,8 @@ import {
   type StockAnalysisResponse, 
   fetchFearGreedAction, 
   fetchCanaryDataAction,
-  fetchMarketOverviewAction
+  fetchMarketOverviewAction,
+  type AnalysisMode
 } from "./actions";
 import { TradingViewChart } from "@/components/tradingview-chart";
 import { FearGreedGauge } from "@/components/fear-greed-gauge";
@@ -42,7 +43,6 @@ import { CanaryCard } from "@/components/canary-card";
 import { InvestorFlowCard } from "@/components/investor-flow-card";
 import { type FearGreedResponse } from "@/lib/api/feargreed";
 import { type IndexPriceData } from "@/lib/api/kis-market";
-import { type AnalysisMode } from "@/lib/analysis/engine";
 
 const ANALYSIS_MODES = [
   { key: "scalp",    label: "단타",  desc: "모멘텀 우선 (당일~3일)" },
