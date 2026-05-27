@@ -318,29 +318,7 @@ export async function fetchCanaryDataAction() {
 
   console.log("[ACTION] fetchCanaryDataAction 호출 시작...");
 
-  // 1. 백엔드 브릿지 경로
-  try {
-    const res = await fetch(`${BACKEND_URL}/api/v1/market/canary`, { cache: 'no-store', signal: AbortSignal.timeout(5000) });
-    if (res.ok) {
-      const data = await res.json();
-      if (data && data.newHighCount !== undefined) {
-        data.highTrend = [
-            { date: '4일전', count: Math.floor(data.newHighCount * 0.8) },
-            { date: '3일전', count: Math.floor(data.newHighCount * 1.1) },
-            { date: '2일전', count: Math.floor(data.newHighCount * 0.9) },
-            { date: '1일전', count: Math.floor(data.newHighCount * 0.7) },
-            { date: '오늘', count: data.newHighCount },
-        ];
-      }
-      console.log("[ACTION] [BRIDGE] 백엔드로부터 카나리아 데이터 로드 성공");
-      setCachedData('canary_data', data);
-      return data;
-    }
-  } catch (bridgeErr: any) {
-    console.warn("[ACTION] [BRIDGE] 카나리아 데이터 브릿지 실패, 폴백합니다:", bridgeErr.message);
-  }
-
-  // 2. KIS API 직접 호출 폴백 경로
+  // 1. KIS API 직접 호출 (우선 처리)
   try {
     const [funds, creditHistory, newHighCount, adrData] = await Promise.all([
       fetchMarketFunds().catch(() => null),
@@ -349,7 +327,7 @@ export async function fetchCanaryDataAction() {
       fetchADRFromInfo().catch(() => ({ kospi: null, kosdaq: null }))
     ]);
 
-    console.log(`[ACTION] Canary API 결과 수신 (폴백 경로):
+    console.log(`[ACTION] Canary API 결과 수신:
       - Funds: ${funds ? "성공" : "실패(null)"}
       - CreditHistory: ${creditHistory?.length || 0} items
       - New High Count: ${newHighCount}
@@ -381,12 +359,14 @@ export async function fetchCanaryDataAction() {
     return result;
   } catch (error: any) {
     console.error("[ACTION] fetchCanaryDataAction 크리티컬 에러:", error.message || error);
+    // 실패 시 예비 데이터 반환
     return { 
         funds: null, creditHistory: [], 
         adrKospi: null, adrKosdaq: null,
         newHighCount: 0, highTrend: []
     };
   }
+
 }
 
 /**
