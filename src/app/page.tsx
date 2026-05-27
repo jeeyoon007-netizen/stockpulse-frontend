@@ -397,12 +397,12 @@ export default function DashboardPage() {
                     <div>
                       <div className="font-black text-sm">
                         {analysisResult.analysis.veto.priority === 'P1' 
-                          ? '최우선 리스크: 즉각 탈출 및 대피 권고' 
-                          : '일반 리스크: 관망 및 진입 보류'}
-                        <span className="ml-2 font-normal text-xs text-red-400/70">
+                          ? '경보 - 탈출 우선' 
+                          : '홀딩 - 진입 보류(관망)'}
+                        <span className="ml-2 font-normal text-[11px] text-red-400/70 block sm:inline-block mt-0.5 sm:mt-0">
                           {analysisResult.analysis.veto.priority === 'P1'
-                            ? '(시장 상황에 따라 계속 하락 할 수 있습니다.)'
-                            : '(시장 상황에 따라 계속 상승 할 수 있습니다.)'}
+                            ? '(단, 극단적 모멘텀이나 광풍 장세에서는 과열 지표를 무시하고 추가 폭등이 나타날 수 있습니다.)'
+                            : '(단, 박스권 횡보 수렴 이후 거래량이 급증하면 상방 또는 하방으로 강력한 방향성 돌파가 일어날 수 있습니다.)'}
                         </span>
                       </div>
                       <div className="font-normal text-red-300/80 mt-1">{analysisResult.analysis.veto.reason}</div>
