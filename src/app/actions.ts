@@ -326,6 +326,7 @@ export async function fetchCanaryDataAction() {
       if (data && data.newHighCount !== undefined) {
         try {
           // 1. Supabase에서 최근 5영업일 데이터 조회
+          if (!supabase) throw new Error("Supabase client is not initialized");
           const { data: dbHistory } = await supabase
             .from('market_new_highs_history')
             .select('trade_date, new_high_count')
