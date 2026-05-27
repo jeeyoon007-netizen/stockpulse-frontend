@@ -399,6 +399,11 @@ export default function DashboardPage() {
                         {analysisResult.analysis.veto.priority === 'P1' 
                           ? '최우선 리스크: 즉각 탈출 및 대피 권고' 
                           : '일반 리스크: 관망 및 진입 보류'}
+                        <span className="ml-2 font-normal text-xs text-red-400/70">
+                          {analysisResult.analysis.veto.priority === 'P1'
+                            ? '(시장 상황에 따라 계속 하락 할 수 있습니다.)'
+                            : '(시장 상황에 따라 계속 상승 할 수 있습니다.)'}
+                        </span>
                       </div>
                       <div className="font-normal text-red-300/80 mt-1">{analysisResult.analysis.veto.reason}</div>
                       <div className="font-mono text-[10px] text-red-400/60 mt-0.5">트리거: {analysisResult.analysis.veto.source}</div>
