@@ -50,6 +50,12 @@ const ANALYSIS_MODES = [
   { key: "position", label: "장기",  desc: "구조 우선 (1개월+)" },
 ] as const;
 
+const WEIGHT_PROFILES = {
+  scalp:    { trend: 0.20, energy: 0.30, momentum: 0.50 },
+  swing:    { trend: 0.40, energy: 0.35, momentum: 0.25 },
+  position: { trend: 0.55, energy: 0.30, momentum: 0.15 },
+} as const;
+
 const STATE_STYLES = {
   AGGRESSIVE_LONG: { color: "text-stock-up",       bg: "bg-stock-up/10",   border: "border-stock-up/30" },
   CAUTIOUS_LONG:   { color: "text-amber-400",       bg: "bg-amber-500/10",  border: "border-amber-500/30" },
@@ -317,6 +323,7 @@ export default function DashboardPage() {
               <div className="space-y-6 animate-in zoom-in-95 duration-500">
                 <Separator className="bg-border/50" />
                 
+                {/* 단기, 스윙, 장기 탭 버튼 */}
                 <div className="flex bg-muted/40 p-0.5 rounded-lg text-xs font-bold border border-border/50 mb-4">
                   {ANALYSIS_MODES.map(m => (
                     <button
@@ -339,6 +346,37 @@ export default function DashboardPage() {
                   ))}
                 </div>
 
+                {/* 실시간 3인 전문가 분석 기여도 분포 가로 바 */}
+                <div className="bg-background/30 rounded-xl p-3.5 border border-border/50 space-y-2 mb-6 animate-in fade-in duration-300">
+                  <div className="flex justify-between items-center text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                    <span>실시간 3인 전문가 의사결정 기여도</span>
+                    <span className="font-mono text-primary bg-primary/10 px-2.5 py-0.5 rounded-md border border-primary/20 text-[9px]">{mode.toUpperCase()} 모드</span>
+                  </div>
+                  <div className="h-3.5 w-full rounded-full overflow-hidden flex bg-muted/50 border border-border/30 shadow-inner">
+                    <div 
+                      className="bg-stock-up/85 hover:bg-stock-up transition-all duration-300 relative flex items-center justify-center"
+                      style={{ width: `${Math.round(WEIGHT_PROFILES[mode].momentum * 100)}%` }}
+                      title={`모멘텀 전문가: ${Math.round(WEIGHT_PROFILES[mode].momentum * 100)}%`}
+                    >
+                      <span className="text-[8px] font-black text-white opacity-95 truncate px-1">모멘텀 {Math.round(WEIGHT_PROFILES[mode].momentum * 100)}%</span>
+                    </div>
+                    <div 
+                      className="bg-amber-400/85 hover:bg-amber-400 transition-all duration-300 relative flex items-center justify-center"
+                      style={{ width: `${Math.round(WEIGHT_PROFILES[mode].trend * 100)}%` }}
+                      title={`파동/추세 전문가: ${Math.round(WEIGHT_PROFILES[mode].trend * 100)}%`}
+                    >
+                      <span className="text-[8px] font-black text-slate-900 opacity-95 truncate px-1">추세 {Math.round(WEIGHT_PROFILES[mode].trend * 100)}%</span>
+                    </div>
+                    <div 
+                      className="bg-blue-400/85 hover:bg-blue-400 transition-all duration-300 relative flex items-center justify-center"
+                      style={{ width: `${Math.round(WEIGHT_PROFILES[mode].energy * 100)}%` }}
+                      title={`에너지 전문가: ${Math.round(WEIGHT_PROFILES[mode].energy * 100)}%`}
+                    >
+                      <span className="text-[8px] font-black text-white opacity-95 truncate px-1">수급 {Math.round(WEIGHT_PROFILES[mode].energy * 100)}%</span>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
                   <div>
                     <h3 className="text-xl md:text-3xl font-black">{analysisResult.stockData.name} <span className="text-sm md:text-lg text-muted-foreground font-mono font-normal tracking-wider ml-1">({analysisResult.stockData.code})</span></h3>
@@ -351,89 +389,63 @@ export default function DashboardPage() {
                       </Badge>
                     </div>
                   </div>
-                  <div className="text-right flex flex-col items-end">
-                    <p className="text-[10px] font-bold text-muted-foreground mb-1.5 uppercase tracking-widest">Market State</p>
-                    <div className={`px-4 py-2 rounded-xl border ${STATE_STYLES[analysisResult.analysis.marketState]?.bg || STATE_STYLES.HOLD.bg} ${STATE_STYLES[analysisResult.analysis.marketState]?.border || STATE_STYLES.HOLD.border} shadow-sm`}>
-                      <div className={`text-sm md:text-base font-black ${STATE_STYLES[analysisResult.analysis.marketState]?.color || STATE_STYLES.HOLD.color}`}>
-                        {analysisResult.analysis.marketStateLabel || analysisResult.analysis.finalVerdict}
-                      </div>
-                      {/* Veto 발동 시 점수 모순 설명 */}
-                      {analysisResult.analysis.marketState === "EXIT_PRIORITY" &&
-                       analysisResult.analysis.weightedScore > 0 &&
-                       analysisResult.analysis.veto?.triggered && (
-                        <div className="text-[11px] text-red-300/70 mt-0.5">
-                          ⚠️ 점수({analysisResult.analysis.weightedScore.toFixed(2)})는 긍정적이나,{' '}
-                          <span className="font-semibold text-red-300">
-                            {analysisResult.analysis.veto.source}
-                          </span>
-                          {' '}Veto로 강제 전환됨
-                        </div>
-                      )}
-                      {analysisResult.analysis.persistCycleRemaining > 0 && (
-                        <div className="text-[9px] md:text-[10px] text-muted-foreground mt-0.5 text-right font-medium">
-                          ⏱ 경보 고착 — {analysisResult.analysis.persistCycleRemaining}회 유지
-                        </div>
-                      )}
-                    </div>
-                    <div className="mt-3 text-xs text-muted-foreground flex justify-end items-center gap-2 w-full max-w-[200px]">
-                      <span>가중 점수: {analysisResult.analysis.weightedScore?.toFixed(2)}</span>
-                      <div className="w-24 h-1.5 bg-muted rounded-full overflow-hidden relative">
-                        <div className="absolute top-0 bottom-0 left-1/2 -ml-[1px] w-[2px] bg-border/80 z-10" />
-                        <div 
-                          className={`absolute top-0 bottom-0 rounded-full ${
-                            analysisResult.analysis.weightedScore > 0.4 ? 'bg-stock-up' :
-                            analysisResult.analysis.weightedScore > 0.2 ? 'bg-amber-400' :
-                            analysisResult.analysis.weightedScore < -0.2 ? 'bg-stock-down' : 'bg-muted-foreground'
-                          }`}
-                          style={{
-                            left: analysisResult.analysis.weightedScore < 0 ? `${50 + analysisResult.analysis.weightedScore * 50}%` : '50%',
-                            width: `${Math.abs(analysisResult.analysis.weightedScore) * 50}%`
-                          }}
-                        />
-                      </div>
-                    </div>
-                  </div>
                 </div>
 
-                {analysisResult.stockData.ohlcv && (
-                  <div className="bg-background/40 rounded-xl overflow-hidden border border-border/50 p-2 shadow-inner">
-                    <TradingViewChart data={analysisResult.stockData.ohlcv} />
-                  </div>
-                )}
-
                 {analysisResult.analysis.veto?.triggered && (
-                  <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-xs font-bold text-red-400 animate-in fade-in">
-                    <span className="text-base shrink-0">🚨</span>
+                  <div className="flex items-center gap-3.5 p-4 bg-red-500/10 border border-red-500/30 rounded-lg text-xs font-bold text-red-400 animate-in fade-in">
+                    <span className="text-lg shrink-0">🚨</span>
                     <div>
-                      <div className="font-black">Veto 발동 — {analysisResult.analysis.veto.priority} 경보</div>
-                      <div className="font-normal text-red-300/80 mt-0.5">{analysisResult.analysis.veto.reason}</div>
+                      <div className="font-black text-sm">
+                        {analysisResult.analysis.veto.priority === 'P1' 
+                          ? '최우선 리스크: 즉각 탈출 및 대피 권고' 
+                          : '일반 리스크: 관망 및 진입 보류'}
+                      </div>
+                      <div className="font-normal text-red-300/80 mt-1">{analysisResult.analysis.veto.reason}</div>
                       <div className="font-mono text-[10px] text-red-400/60 mt-0.5">트리거: {analysisResult.analysis.veto.source}</div>
                     </div>
                   </div>
                 )}
 
+                {/* 3인 전문가 카드 */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {analysisResult.analysis.experts.map((exp, idx) => (
-                    <div key={idx} className="bg-background/80 rounded-xl p-4 border border-border/50 shadow-sm relative overflow-hidden group hover:scale-[1.02] transition-transform duration-300">
-                      <div className={`absolute top-0 right-0 w-1.5 h-full ${directionColor(exp.opinion).replace('text-', 'bg-')} opacity-30`}/>
-                      <h4 className="font-bold text-sm flex justify-between items-center mb-2">
-                        {exp.expertName}
-                        <div className="flex items-center gap-1.5">
-                          {exp.vetoTriggered && <span title={exp.vetoReason} className="text-base leading-none">⚠️</span>}
-                          <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${directionColor(exp.opinion).replace('text-', 'bg-')}/10 ${directionColor(exp.opinion)}`}>{exp.opinion}</span>
+                  {analysisResult.analysis.experts.map((exp, idx) => {
+                    const getWeight = (name: string) => {
+                      if (name.includes("추세")) return WEIGHT_PROFILES[mode].trend;
+                      if (name.includes("에너지")) return WEIGHT_PROFILES[mode].energy;
+                      if (name.includes("모멘텀")) return WEIGHT_PROFILES[mode].momentum;
+                      return 0;
+                    };
+                    const weightPercent = Math.round(getWeight(exp.expertName) * 100);
+
+                    return (
+                      <div key={idx} className="bg-background/80 rounded-xl p-4 border border-border/50 shadow-sm relative overflow-hidden group hover:scale-[1.02] transition-transform duration-300">
+                        <div className={`absolute top-0 right-0 w-1.5 h-full ${directionColor(exp.opinion).replace('text-', 'bg-')} opacity-30`}/>
+                        <h4 className="font-bold text-sm flex justify-between items-center mb-1">
+                          {exp.expertName}
+                          <div className="flex items-center gap-1.5">
+                            {exp.vetoTriggered && <span title={exp.vetoReason} className="text-base leading-none">⚠️</span>}
+                            <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${directionColor(exp.opinion).replace('text-', 'bg-')}/10 ${directionColor(exp.opinion)}`}>{exp.opinion}</span>
+                          </div>
+                        </h4>
+                        
+                        {/* 반영 가중치 배지 */}
+                        <div className="text-[9px] font-bold text-muted-foreground/80 mb-2 flex items-center gap-1">
+                          <Zap className="w-2.5 h-2.5 text-amber-400" />
+                          최종 의사결정 반영 비중: <span className="text-primary font-mono font-bold">{weightPercent}%</span>
                         </div>
-                      </h4>
-                      <div className="flex items-center gap-2 mb-3">
-                          <Progress value={exp.confidence} className="h-1 flex-1 bg-secondary" />
-                          <span className="text-[9px] font-mono font-bold text-muted-foreground">{exp.confidence}%</span>
+
+                        <div className="flex items-center gap-2 mb-3">
+                            <Progress value={exp.confidence} className="h-1 flex-1 bg-secondary" />
+                            <span className="text-[9px] font-mono font-bold text-muted-foreground">{exp.confidence}%</span>
+                        </div>
+                        <p className="text-[11px] text-muted-foreground leading-relaxed italic">"{exp.reason}"</p>
                       </div>
-                      <p className="text-[11px] text-muted-foreground leading-relaxed italic">"{exp.reason}"</p>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <div className="bg-background/50 rounded-xl border border-border/50 overflow-hidden flex flex-col h-72 shadow-sm">
+                  <div className="bg-background/50 rounded-xl border border-border/50 overflow-hidden flex flex-col h-[350px] shadow-sm">
                     <div className="bg-secondary/30 px-4 py-3 border-b border-border/50 flex items-center gap-2">
                       <Gavel className="w-4 h-4 text-chart-4" />
                       <span className="font-bold text-xs uppercase tracking-widest text-muted-foreground">Audit & Cross-Reference Log</span>
@@ -457,7 +469,7 @@ export default function DashboardPage() {
                     </ScrollArea>
                   </div>
 
-                  <div className="bg-background/50 rounded-xl border border-border/50 overflow-hidden flex flex-col min-h-[16rem] shadow-sm">
+                  <div className="bg-background/50 rounded-xl border border-border/50 overflow-hidden flex flex-col h-[350px] shadow-sm">
                     <div className="bg-secondary/30 px-4 py-3 border-b border-border/50 flex items-center gap-2">
                       <Target className="w-4 h-4 text-chart-2" />
                       <span className="font-bold text-xs uppercase tracking-widest text-muted-foreground">Strategic Operation Plan</span>
@@ -486,6 +498,12 @@ export default function DashboardPage() {
                     </div>
                   </div>
                 </div>
+
+                {analysisResult.stockData.ohlcv && (
+                  <div className="bg-background/40 rounded-xl overflow-hidden border border-border/50 p-2 shadow-inner mt-6 animate-in fade-in duration-500">
+                    <TradingViewChart data={analysisResult.stockData.ohlcv} />
+                  </div>
+                )}
               </div>
             )}
           </CardContent>

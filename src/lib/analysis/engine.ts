@@ -68,42 +68,27 @@ export interface AIAnalysisResult {
 type WeightProfile = { trend: number; energy: number; momentum: number };
 
 function checkVeto(data: IndicatorsResult): VetoResult {
-  // ===== 상방 Veto: 극단적 과매도 구간 방어 =====
-  // RSI ≤ 20이고 MFI ≤ 15면 과매도 극단 → P1 하방 Veto 억제, HOLD 강제
-  if (data.rsi <= 20 && data.mfi <= 15) {
-    return {
-      triggered: true, priority: 'P2',
-      reason: `RSI(${data.rsi.toFixed(1)})+MFI(${data.mfi.toFixed(1)}) 극단적 과매도 — 추가 하락 경보 억제`,
-      source: `상방Veto: RSI=${data.rsi.toFixed(1)}, MFI=${data.mfi.toFixed(1)}`,
-      forcedState: 'HOLD'
-    };
-  }
-
-  // 시장 국면별 RSI 임계값 동적 조정
-  // 강세 추세(ADX≥30 + 정배열)에서는 RSI 허용 범위를 85로 완화
-  const isStrongUptrend = data.adx >= 30 && data.sma5 > data.sma20 && data.sma20 > data.sma60;
-  const rsiThreshold = isStrongUptrend ? 85 : 78;
-  if (data.rsi > rsiThreshold) return {
+  if (data.rsi > 78) return {
     triggered: true, priority: 'P1',
-    reason: `RSI(${data.rsi.toFixed(1)}) ${rsiThreshold} 초과 — Veto 발동${isStrongUptrend ? ' (강세장 완화 적용)' : ''}`,
+    reason: `상대강도지수(RSI, ${data.rsi.toFixed(1)}) 78 초과 — 거부권(Veto) 발동`,
     source: `RSI=${data.rsi.toFixed(1)}`,
     forcedState: 'EXIT_PRIORITY'
   };
   if (data.mfi > 85 && data.lastClose < data.vwap) return {
     triggered: true, priority: 'P1',
-    reason: `MFI(${data.mfi.toFixed(1)}) 과매수 + VWAP 하방 이탈 — 대량 분배 경고 (${data.lastClose} < VWAP ${data.vwap.toFixed(0)})`,
-    source: `MFI=${data.mfi.toFixed(1)}, VWAP↓(${data.lastClose}<${data.vwap.toFixed(0)})`,
+    reason: `자금흐름지수(MFI, ${data.mfi.toFixed(1)}) 과매수 + 거래량가중평균선(VWAP) 이탈 — 분배 경고`,
+    source: `MFI=${data.mfi.toFixed(1)}, VWAP 이탈`,
     forcedState: 'EXIT_PRIORITY'
   };
   if (data.lastClose < data.sma60) return {
     triggered: true, priority: 'P1',
-    reason: `SMA60 하방 이탈 — 추세 구조 붕괴`,
+    reason: `60일 이동평균선 하방 이탈 — 추세 구조 붕괴`,
     source: `SMA60 이탈 (${data.lastClose} < ${data.sma60.toFixed(0)})`,
     forcedState: 'EXIT_PRIORITY'
   };
   if (data.adx < 15) return {
     triggered: true, priority: 'P2',
-    reason: `ADX(${data.adx.toFixed(1)}) 15 미만 — 추세 소멸`,
+    reason: `추세강도지수(ADX, ${data.adx.toFixed(1)}) 15 미만 — 추세 소멸`,
     source: `ADX=${data.adx.toFixed(1)}`,
     forcedState: 'HOLD'
   };
@@ -150,7 +135,7 @@ function crossCheck(
     logs.push({
       step: 1,
       expertName: energy.expertName,
-      message: `전반적인 추세는 [하락]이나, 바닥권에서 스마트머니(MFI) 또는 거래량 가중평균(VWAP)을 상회하는 강력한 수급이 감지되어 반등을 시도 중입니다.`,
+      message: `전반적인 추세는 [하락]이나, 바닥권에서 자금흐름지수(MFI) 또는 거래량가중평균선(VWAP)을 상회하는 강력한 수급이 감지되어 반등을 시도 중입니다.`,
     });
   } else if (trend.opinion === energy.opinion && energy.opinion === momentum.opinion && trend.opinion !== "횡보/보합") {
     logs.push({
@@ -170,7 +155,7 @@ function crossCheck(
   logs.push({
     step: 2,
     expertName: "총괄 AI",
-    message: `가중치 분석 결과 (모멘텀 ${weights.momentum * 100}%, 추세 ${weights.trend * 100}%, 에너지 ${weights.energy * 100}%), 최종 점수는 ${weightedScore.toFixed(2)}점이며 방향성은 [${verdict}]을 향하고 있습니다.`,
+    message: `가중치 분석 결과 (모멘텀 ${Math.round(weights.momentum * 100)}%, 추세 ${Math.round(weights.trend * 100)}%, 에너지 ${Math.round(weights.energy * 100)}%), 최종 점수는 ${weightedScore.toFixed(2)}점이며 방향성은 [${verdict}]을 향하고 있습니다.`,
   });
 
   return { logs, weightedScore, verdict };
@@ -227,13 +212,6 @@ export function classifyMarketState(
 
   // 신호 고착 유지: 이전 사이클 잔여가 남아있으면 EXIT_PRIORITY 유지
   if (prevPersistCycle > 0) {
-    // 조기 해제 조건: RSI 40 이하 반등 + VWAP 상회 + 정배열 회복
-    const isRecovering = data.rsi < 40 && data.lastClose > data.vwap &&
-                          data.sma5 > data.sma20;
-    if (isRecovering) {
-      // 반등 시그널이 강하면 고착을 즉시 해제
-      return { state: "HOLD", persistCycleRemaining: 0 };
-    }
     return { state: "EXIT_PRIORITY", persistCycleRemaining: prevPersistCycle - 1 };
   }
 
