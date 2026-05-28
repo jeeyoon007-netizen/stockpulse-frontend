@@ -282,6 +282,13 @@ export async function fetchCanaryDataAction() {
     const res = await fetch(`${BACKEND_URL}/api/v1/market/canary`, { cache: 'no-store', signal: AbortSignal.timeout(5000) });
     if (res.ok) {
       const data = await res.json();
+      
+      // 백엔드 캐시가 비어있으면 폴백으로 전환
+      if (!data || Object.keys(data).length === 0) {
+        console.warn('[ACTION] [BRIDGE] 백엔드 데이터가 비어있습니다. 폴백 경로로 전환.');
+        throw new Error('빈 데이터');
+      }
+
       if (data && data.newHighCount !== undefined) {
         try {
           // 1. Supabase에서 최근 5영업일 데이터 조회
@@ -377,7 +384,8 @@ export async function fetchCanaryDataAction() {
         creditHistory, 
         adrKospi: adrData?.kospi || null,
         adrKosdaq: adrData?.kosdaq || null,
-        newHighCount,
+        newHighCount: typeof newHighCount === 'number' ? newHighCount : 0,
+        newHighSectors: [], // 폴백 경로는 업종 분류 불가 (로컴페이지 구조 차이)
         highTrend
     };
 
