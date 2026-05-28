@@ -143,7 +143,6 @@
     @apply font-sans;
     overflow-x: hidden;
     -webkit-text-size-adjust: 100%;
-    font-size: 17px;
   }
 }
 
@@ -240,16 +239,3 @@ html, body, #__next {
 * {
   -webkit-overflow-scrolling: touch;
 }
-
-/* ========================================
-   ABSOLUTE PIXEL FONT SIZE OVERRIDES
-   (Scales hardcoded text-[Xpx] elements by EXACTLY +1px)
-   ======================================== */
-.text-\[7px\] { font-size: 8px !important; }
-.text-\[8px\] { font-size: 9px !important; }
-.text-\[9px\] { font-size: 10px !important; }
-.text-\[10px\] { font-size: 11px !important; }
-.text-\[10\.5px\] { font-size: 11.5px !important; }
-.text-\[11px\] { font-size: 12px !important; }
-.text-\[12px\] { font-size: 13px !important; }
-.text-\[13px\] { font-size: 14px !important; }
