@@ -41,6 +41,7 @@ import { TradingViewChart } from "@/components/tradingview-chart";
 import { FearGreedGauge } from "@/components/fear-greed-gauge";
 import { CanaryCard } from "@/components/canary-card";
 import { InvestorFlowCard } from "@/components/investor-flow-card";
+import { MacroIndicators } from "@/components/macro-indicators";
 import { type FearGreedResponse } from "@/lib/api/feargreed";
 import { type IndexPriceData } from "@/lib/api/kis-market";
 
@@ -546,6 +547,11 @@ export default function DashboardPage() {
              }} 
            />
         </div>
+      </section>
+
+      {/* --- [Macro Indicators Section: Ratios and Gap Analysis] --- */}
+      <section id="macro-indicators" className="mt-8 animate-in fade-in slide-in-from-bottom-6 duration-500 delay-400">
+         <MacroIndicators canaryData={canaryData} marketOverview={marketOverview} />
       </section>
 
     </div>
