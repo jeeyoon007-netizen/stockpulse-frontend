@@ -326,6 +326,17 @@ export async function fetchCanaryDataAction() {
         }
       }
       console.log("[ACTION] [BRIDGE] 백엔드로부터 카나리아 데이터 로드 성공");
+
+      // ADR: 백엔드(Render)IP 사용 없음 → Vercel 서버에서 직접 크롤링
+      try {
+        const adrResult = await fetchADRFromInfo();
+        data.adrKospi = adrResult.kospi;
+        data.adrKosdaq = adrResult.kosdaq;
+        console.log(`[ACTION] ADR Vercel 크롤링: KOSPI=${adrResult.kospi?.adr || 'N/A'}%, KOSDAQ=${adrResult.kosdaq?.adr || 'N/A'}%`);
+      } catch (adrErr: any) {
+        console.warn('[ACTION] ADR 크롤링 실패:', adrErr.message);
+      }
+
       setCachedData('canary_data', data);
       return data;
     }
@@ -335,7 +346,7 @@ export async function fetchCanaryDataAction() {
 
   // 2. KIS API 직접 호출 폴백 경로
   try {
-    const [funds, creditHistory, newHighCount, adrData] = await Promise.all([
+    const [funds, creditHistory, newHighCount, adrResult] = await Promise.all([
       fetchMarketFunds().catch(() => null),
       fetchDailyCreditBalance(20).catch(() => []),
       fetchNewHighCount().catch(() => 0),
@@ -346,7 +357,7 @@ export async function fetchCanaryDataAction() {
       - Funds: ${funds ? "성공" : "실패(null)"}
       - CreditHistory: ${creditHistory?.length || 0} items
       - New High Count: ${newHighCount}
-      - ADR Data: ${adrData ? "성공" : "실패(null)"}
+      - ADR Data: ${adrResult ? "성공" : "실패(null)"}
     `);
 
     // 폴백 경로에서도 Supabase에서 실제 기록 가져오기
@@ -382,8 +393,8 @@ export async function fetchCanaryDataAction() {
     const result = { 
         funds, 
         creditHistory, 
-        adrKospi: adrData?.kospi || null,
-        adrKosdaq: adrData?.kosdaq || null,
+        adrKospi: adrResult?.kospi || null,
+        adrKosdaq: adrResult?.kosdaq || null,
         newHighCount: typeof newHighCount === 'number' ? newHighCount : 0,
         newHighSectors: [], // 폴백 경로는 업종 분류 불가 (로컴페이지 구조 차이)
         highTrend
