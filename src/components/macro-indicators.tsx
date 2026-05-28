@@ -40,14 +40,67 @@ export function MacroIndicators({ canaryData, marketOverview }: MacroIndicatorsP
   const isMarketUp = kospi && (kospi.direction === "up" || kospi.direction === "상승");
   const isMarketDown = kospi && (kospi.direction === "down" || kospi.direction === "하락");
   
-  // Note: 당일 자금 증가/감소를 알기 위해서는 어제 자금이 필요하지만 현재 In-memory에는 없음 (Phase 2에서 정교화)
-  // 현재는 예시 로직으로 표출
-  const gapAnalysis = {
-    title: "지수 vs 증시자금 괴리 분석",
-    message: isMarketUp ? "지수는 상승세이나 자금 동향 데이터 축적 대기 중입니다 (Phase 2 연동 필요)." : "장세에 따른 자금 이탈 모니터링 중입니다.",
-    status: "대기", // '주의', '경고', '위험'
-    color: "text-muted-foreground"
+  const macro = canaryData?.macroAnalysis || {
+    consecutiveDepositDecline: 0,
+    consecutiveCreditIncrease: 0,
+    creditMinMax: 0,
+    creditPercentile: 0,
   };
+
+  const depDown = macro.consecutiveDepositDecline;
+  const credUp = macro.consecutiveCreditIncrease;
+
+  let gapAnalysis = {
+    title: "지수 vs 증시자금 괴리 분석",
+    message: "장세에 따른 자금 이탈 모니터링 중입니다.",
+    status: "정상", // '정상', '주의', '경고', '위험'
+    color: "text-muted-foreground",
+    icon: TrendingUp
+  };
+
+  if (depDown >= 3 && credUp >= 1) {
+    gapAnalysis = {
+      title: "위험: 최악의 자금 괴리",
+      message: `🔴 현금(예탁금)은 ${depDown}일 연속 빠지는데 빚(신용)은 증가 중입니다. 레버리지 청산 압력이 커지는 매우 위험한 상태입니다.`,
+      status: "위험",
+      color: "text-red-500",
+      icon: ShieldAlert
+    };
+  } else if (depDown >= 5) {
+    gapAnalysis = {
+      title: "위험: 강력한 자금 이탈",
+      message: `🔴 예탁금이 ${depDown}일 연속 하락 중입니다. 시장 방향과 무관하게 자금 이탈이 확정적입니다.`,
+      status: "위험",
+      color: "text-red-500",
+      icon: ShieldAlert
+    };
+  } else if (depDown >= 3 && isMarketDown) {
+    gapAnalysis = {
+      title: "경고: 투자심리 위축",
+      message: `🟠 지수 하락과 함께 예탁금도 ${depDown}일 연속 하락 중입니다. 시장 분위기가 냉각되고 있습니다.`,
+      status: "경고",
+      color: "text-orange-500",
+      icon: AlertTriangle
+    };
+  } else if (depDown >= 3 && isMarketUp) {
+    gapAnalysis = {
+      title: "경고: 투자자 이탈 신호",
+      message: `🟠 지수는 상승 중이나 예탁금은 ${depDown}일 연속 하락했습니다. 겉보기와 달리 실질적 투자금이 빠져나가고 있습니다.`,
+      status: "경고",
+      color: "text-orange-500",
+      icon: AlertTriangle
+    };
+  } else if (depDown >= 2 && isMarketUp) {
+    gapAnalysis = {
+      title: "주의: 자금 이탈 초기",
+      message: `🟡 지수 상승에도 불구하고 예탁금이 2일 연속 하락했습니다. 추세를 관망하세요.`,
+      status: "주의",
+      color: "text-yellow-500",
+      icon: AlertCircle
+    };
+  } else if (isMarketUp) {
+    gapAnalysis.message = "지수가 상승하며 정상적인 자금 흐름을 보이고 있습니다.";
+  }
 
   return (
     <Card className="border-border/50 bg-background/30 shadow-sm relative overflow-hidden">
@@ -94,17 +147,27 @@ export function MacroIndicators({ canaryData, marketOverview }: MacroIndicatorsP
         </div>
 
         {/* Gap Analysis */}
-        <div className="bg-background/50 rounded-xl p-3 border border-border/50 shadow-inner">
+        <div className={`bg-background/50 rounded-xl p-3 border border-border/50 shadow-inner ${gapAnalysis.status === '위험' ? 'border-red-500/50 bg-red-500/5' : gapAnalysis.status === '경고' ? 'border-orange-500/50 bg-orange-500/5' : ''}`}>
           <div className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest mb-2 flex items-center gap-1.5">
-            <TrendingUp className="w-3.5 h-3.5" />
+            <gapAnalysis.icon className={`w-3.5 h-3.5 ${gapAnalysis.color}`} />
             {gapAnalysis.title}
           </div>
           <div className="flex items-start gap-2 mt-2">
-            <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground mt-1.5" />
+            <div className={`w-1.5 h-1.5 rounded-full mt-1.5 ${gapAnalysis.color.replace('text-', 'bg-')}`} />
             <p className={`text-xs font-medium leading-relaxed ${gapAnalysis.color}`}>
               {gapAnalysis.message}
             </p>
           </div>
+          
+          {macro.creditPercentile > 0 && (
+            <div className="mt-3 pt-3 border-t border-border/30 flex justify-between items-center">
+               <span className="text-[10px] text-muted-foreground">신용잔고 위치 (240일 기준)</span>
+               <div className="flex items-center gap-2">
+                 <span className="text-[10px] text-muted-foreground font-mono" title="역대 최저/최고 대비 %">MinMax: {macro.creditMinMax.toFixed(1)}%</span>
+                 <span className="text-[10px] text-primary font-bold font-mono" title="전체 영업일 중 현재 위치">상위: {(100 - macro.creditPercentile).toFixed(1)}%</span>
+               </div>
+            </div>
+          )}
         </div>
 
       </CardContent>

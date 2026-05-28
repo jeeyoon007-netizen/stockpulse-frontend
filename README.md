@@ -15,11 +15,13 @@ build_args:
 
 StockPulse is an AI-powered stock dashboard fetching real-time market data and generating trading insights.
 
-## Recent Features (Phase 1)
-- **Macro Market Indicators**: Added real-time tracking for credit-to-deposit ratio (신용잔고/예탁금 비율) and credit-to-market-cap ratio (신용잔고/시가총액 비율) to monitor leverage in the Korean stock market.
-- **Dynamic Warning Thresholds**: 
-  - Caution (🟡), Warning (🟠), and Danger (🔴) signals are displayed when leverage density hits historical extremes.
-- **Independent Layout**: Macro indicators are isolated into a separate component, preserving the original top canary metrics.
+## Recent Features
+- **Phase 1: Macro Market Indicators**: Added real-time tracking for credit-to-deposit ratio (신용잔고/예탁금 비율) and credit-to-market-cap ratio (신용잔고/시가총액 비율) to monitor leverage in the Korean stock market.
+- **Phase 2: Macro Funds Trend System (매크로 자금동향 시스템)**:
+  - Supabase Time-series DB Integration for tracking Market Funds & Credit History.
+  - Backend 16:00 Scheduler for daily accumulation of financial data.
+  - Advanced Gap Analysis with 5 Warning Levels based on deposit consecutive decline, credit increase, and index divergence.
+  - Credit Balance Percentile & Min-Max normalizations evaluated against rolling 240 trading days.
 
 ## Getting Started
 
