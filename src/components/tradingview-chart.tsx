@@ -12,11 +12,18 @@ interface OHLCV {
   volume: number;
 }
 
-interface TradingViewChartProps {
-  data: OHLCV[];
+interface TradeMarker {
+  trade_date: string;
+  action: 'Buy' | 'Sell';
+  price: number;
 }
 
-export function TradingViewChart({ data }: TradingViewChartProps) {
+interface TradingViewChartProps {
+  data: OHLCV[];
+  trades?: TradeMarker[];
+}
+
+export function TradingViewChart({ data, trades }: TradingViewChartProps) {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const [isMobile, setIsMobile] = useState(false);
 
@@ -89,6 +96,24 @@ export function TradingViewChart({ data }: TradingViewChartProps) {
     });
 
     candleSeries.setData(chartData as any);
+
+    // 백테스트 매매 마커 추가
+    if (trades && trades.length > 0) {
+      const markers = trades.map(t => {
+        const year = t.trade_date.substring(0, 4);
+        const month = t.trade_date.substring(4, 6);
+        const day = t.trade_date.substring(6, 8);
+        return {
+          time: `${year}-${month}-${day}`,
+          position: t.action === 'Buy' ? 'belowBar' : 'aboveBar',
+          color: t.action === 'Buy' ? '#ef4444' : '#3b82f6', // KIS/한국 스타일 (빨강 매수, 파랑 매도)
+          shape: t.action === 'Buy' ? 'arrowUp' : 'arrowDown',
+          text: t.action === 'Buy' ? 'Buy' : 'Sell'
+        };
+      });
+      // @ts-ignore
+      candleSeries.setMarkers(markers);
+    }
 
     chart.timeScale().fitContent();
 

@@ -25,7 +25,7 @@ const menuItems = [
     icon: LayoutDashboard,
   },
   {
-    label: "검색 기록",
+    label: "관심종목 List",
     href: "/history",
     icon: History,
   },

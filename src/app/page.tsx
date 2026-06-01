@@ -42,6 +42,7 @@ import { FearGreedGauge } from "@/components/fear-greed-gauge";
 import { CanaryCard } from "@/components/canary-card";
 import { InvestorFlowCard } from "@/components/investor-flow-card";
 import { MacroIndicators } from "@/components/macro-indicators";
+import { WatchlistButton } from "@/components/ui/watchlist-button";
 import { type FearGreedResponse } from "@/lib/api/feargreed";
 import { type IndexPriceData } from "@/lib/api/kis-market";
 
@@ -92,13 +93,32 @@ export default function DashboardPage() {
     highTrend: []
   });
 
+  const [backtestTrades, setBacktestTrades] = useState<any[]>([]);
+
   useEffect(() => {
     setTimeStr(new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" }));
     
     // 종목 마스터 JSON 로드
     fetch("/stocks.json")
       .then(res => res.json())
-      .then(data => setStocks(data))
+      .then(data => {
+        setStocks(data);
+        
+        // URL의 ?code=402340 쿼리 파라미터가 존재할 시 자동 분석 실행
+        const params = new URLSearchParams(window.location.search);
+        const codeFromUrl = params.get("code");
+        if (codeFromUrl && codeFromUrl.length >= 6) {
+          setStockCode(codeFromUrl);
+          const match = data.find((s: any) => s.code === codeFromUrl);
+          if (match) {
+            setSearchInput(match.name);
+          } else {
+            setSearchInput(codeFromUrl);
+          }
+          // handleAnalyze 호출
+          handleAnalyze(codeFromUrl);
+        }
+      })
       .catch(err => console.error("stocks.json 로드 실패:", err));
 
     // 시장 지표 로드
@@ -115,6 +135,27 @@ export default function DashboardPage() {
   const [loadingStep, setLoadingStep] = useState(0);
   const [analysisResult, setAnalysisResult] = useState<StockAnalysisResponse | null>(null);
   const [mode, setMode] = useState<AnalysisMode>("scalp");
+
+  // 분석 결과 완료 시 백테스트 타점 정보 자동 조회
+  useEffect(() => {
+    if (analysisResult?.success && analysisResult.stockData?.code) {
+      fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080"}/api/v1/analysis/backtest?code=${analysisResult.stockData.code}`)
+        .then(res => res.json())
+        .then(json => {
+          if (json.success && json.data && json.data.trades) {
+            setBacktestTrades(json.data.trades);
+          } else {
+            setBacktestTrades([]);
+          }
+        })
+        .catch(err => {
+          console.error("Failed to fetch backtest trades", err);
+          setBacktestTrades([]);
+        });
+    } else {
+      setBacktestTrades([]);
+    }
+  }, [analysisResult]);
 
   const filteredStocks = searchInput
     ? stocks.filter(s => s.name.includes(searchInput) || s.code.includes(searchInput)).slice(0, 6)
@@ -380,7 +421,10 @@ export default function DashboardPage() {
 
                 <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
                   <div>
-                    <h3 className="text-xl md:text-3xl font-black">{analysisResult.stockData.name} <span className="text-sm md:text-lg text-muted-foreground font-mono font-normal tracking-wider ml-1">({analysisResult.stockData.code})</span></h3>
+                    <div className="flex items-center gap-3">
+                      <h3 className="text-xl md:text-3xl font-black">{analysisResult.stockData.name} <span className="text-sm md:text-lg text-muted-foreground font-mono font-normal tracking-wider ml-1">({analysisResult.stockData.code})</span></h3>
+                      <WatchlistButton stockCode={analysisResult.stockData.code} stockName={analysisResult.stockData.name} />
+                    </div>
                     <div className="flex items-center gap-3 mt-1.5">
                       <span className="text-lg md:text-2xl font-black font-mono tracking-tighter">
                          ₩{analysisResult.stockData.currentPrice.toLocaleString()}
@@ -507,7 +551,7 @@ export default function DashboardPage() {
 
                 {analysisResult.stockData.ohlcv && (
                   <div className="bg-background/40 rounded-xl overflow-hidden border border-border/50 p-2 shadow-inner mt-6 animate-in fade-in duration-500">
-                    <TradingViewChart data={analysisResult.stockData.ohlcv} />
+                    <TradingViewChart data={analysisResult.stockData.ohlcv} trades={backtestTrades} />
                   </div>
                 )}
               </div>

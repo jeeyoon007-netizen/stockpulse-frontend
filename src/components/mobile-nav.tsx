@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 
 const mobileMenuItems = [
   { label: "대시보드", href: "/", icon: LayoutDashboard },
-  { label: "검색 기록", href: "/history", icon: History },
+  { label: "관심종목 List", href: "/history", icon: History },
 ];
 
 export function MobileNav() {
