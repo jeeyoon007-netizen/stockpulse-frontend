@@ -464,68 +464,6 @@ export async function fetchInvestorRanking(type: '1' | '2', market = '0001'): Pr
   }
 }
 
-export async function fetchNewHighCount(): Promise<number> {
-  const token = await getAccessToken();
-  const appKey = process.env.KIS_APP_KEY!;
-  const appSecret = process.env.KIS_APP_SECRET!;
-
-  const fetchMarketHigh = async (marketCode: '0001' | '1001'): Promise<number> => {
-    let totalItems: any[] = [];
-    let trCont = "";
-    
-    // 최대 5페이지까지 가져오도록 제한 (무한루프 방지 및 150종목 확보 가능)
-    for (let i = 0; i < 5; i++) {
-        const url = `${KIS_BASE_URL}/uapi/domestic-stock/v1/ranking/near-new-highlow?fid_cond_mrkt_div_code=J&fid_cond_scr_div_code=20187&fid_div_cls_code=0&fid_input_cnt_1=0&fid_input_cnt_2=0&fid_prc_cls_code=0&fid_input_iscd=${marketCode}&fid_trgt_cls_code=0&fid_trgt_exls_cls_code=0&fid_aply_rang_prc_1=0&fid_aply_rang_prc_2=1000000&fid_aply_rang_vol=0`;
-
-        const headers: any = {
-            "Content-Type": "application/json",
-            authorization: `Bearer ${token}`,
-            appkey: appKey,
-            appsecret: appSecret,
-            tr_id: "FHPST01870000",
-            custtype: "P",
-        };
-        
-        if (trCont) {
-            headers.tr_cont = trCont;
-        }
-
-        try {
-            const res = await fetchWithTimeout(url, { headers, cache: "no-store" });
-            if (!res.ok) break;
-            
-            // 연속 호출용 tr_cont 헤더 추출
-            trCont = res.headers.get("tr_cont") || "";
-            
-            const data = await res.json();
-            if (data.rt_cd === "0" && Array.isArray(data.output)) {
-                totalItems = [...totalItems, ...data.output];
-            } else {
-                break;
-            }
-            
-            // 더 이상 데이터가 없으면 중단
-            if (trCont !== "M" && trCont !== "F") break;
-            
-            // API 초과 호출 방지 (매우 짧은 대기)
-            await new Promise(r => setTimeout(r, 50));
-        } catch (error) {
-            console.error(`fetchMarketHigh(${marketCode}) error at page ${i+1}:`, error);
-            break;
-        }
-    }
-    
-    console.log(`[KIS DEBUG] fetchNewHighCount(${marketCode}) 최종 수집합계: ${totalItems.length}`);
-    return totalItems.length;
-  };
-
-  const [kospiCount, kosdaqCount] = await Promise.all([
-    fetchMarketHigh('0001'), // KOSPI
-    fetchMarketHigh('1001')  // KOSDAQ
-  ]);
-
-  return kospiCount + kosdaqCount;
-}
 
 /**
  * 특정 종목의 상세 정보(시가총액, 업종 등)를 가져옵니다.

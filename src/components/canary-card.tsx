@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { type MarketFundsData, type CreditBalanceData } from "@/lib/api/kis-market";
-import { TrendingUp, TrendingDown, Minus, Wallet, CreditCard, Activity, X, Bot } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, Wallet, CreditCard, Activity, X, Bot, AlertTriangle, AlertCircle, ShieldAlert } from "lucide-react";
 
 interface Props {
   data: {
@@ -18,16 +18,16 @@ interface Props {
       time: string;
       signal: string;
     } | null;
-    newHighCount?: number;
-    newHighSectors?: { sector: string; count: number; stocks?: { name: string; code: string }[] }[];
-    highTrend?: { date: string, count: number }[];
+    creditDepositRatio?: number;
+    creditMarketCapRatio?: number;
+    macroAnalysis?: any;
   };
+  marketOverview: any[];
   onAnalyze?: (code: string, name: string) => void;
 }
 
-export function CanaryCard({ data, onAnalyze }: Props) {
-  const { funds, creditHistory, adrKospi, adrKosdaq, newHighCount = 0, newHighSectors = [], highTrend = [] } = data;
-  const [activeSector, setActiveSector] = useState<{ sector: string; count: number; stocks?: { name: string; code: string }[] } | null>(null);
+export function CanaryCard({ data, marketOverview, onAnalyze }: Props) {
+  const { funds, creditHistory, adrKospi, adrKosdaq } = data;
   const [confirmState, setConfirmState] = useState<{ x: number, y: number, code: string, name: string } | null>(null);
   
   // Format Large Money (KRW 억/조)
@@ -85,6 +85,128 @@ export function CanaryCard({ data, onAnalyze }: Props) {
     if (signal.includes("바닥")) return "text-stock-up";
     return "text-muted-foreground";
   };
+
+  const cdRatio = data.creditDepositRatio || 0;
+  const cmRatio = data.creditMarketCapRatio || 0;
+
+  // Thresholds Check
+  const getLevel = (val: number, type: 'CD' | 'CM') => {
+    if (type === 'CD') {
+      if (val >= 90) return { level: '위험', color: 'bg-red-500', bgClass: 'bg-red-500/10', borderClass: 'border-red-500/20', textColor: 'text-red-500', alert: '🔴 위험: 강제청산 연쇄 우려' };
+      if (val >= 75) return { level: '경고', color: 'bg-orange-500', bgClass: 'bg-orange-500/10', borderClass: 'border-orange-500/20', textColor: 'text-orange-500', alert: '🟠 경고: 반대매매 연쇄 위험' };
+      if (val >= 60) return { level: '주의', color: 'bg-yellow-500', bgClass: 'bg-yellow-500/10', borderClass: 'border-yellow-500/20', textColor: 'text-yellow-500', alert: '🟡 주의: 레버리지 누적 시작' };
+      return { level: '정상', color: 'bg-emerald-500', bgClass: 'bg-emerald-500/10', borderClass: 'border-emerald-500/20', textColor: 'text-emerald-500', alert: '🟢 정상: 레버리지 비율 안정' };
+    } else {
+      if (val >= 1.6) return { level: '위험', color: 'bg-red-500', bgClass: 'bg-red-500/10', borderClass: 'border-red-500/20', textColor: 'text-red-500', alert: '🔴 위험: 신용 비중 극단' };
+      if (val >= 1.3) return { level: '경고', color: 'bg-orange-500', bgClass: 'bg-orange-500/10', borderClass: 'border-orange-500/20', textColor: 'text-orange-500', alert: '🟠 경고: 하방 시 투매 우려' };
+      if (val >= 1.0) return { level: '주의', color: 'bg-yellow-500', bgClass: 'bg-yellow-500/10', borderClass: 'border-yellow-500/20', textColor: 'text-yellow-500', alert: '🟡 주의: 신용 경계 수준' };
+      return { level: '정상', color: 'bg-emerald-500', bgClass: 'bg-emerald-500/10', borderClass: 'border-emerald-500/20', textColor: 'text-emerald-500', alert: '🟢 정상: 시총 대비 신용 안정' };
+    }
+  };
+
+  const cdStatus = getLevel(cdRatio, 'CD');
+  const cmStatus = getLevel(cmRatio, 'CM');
+
+  // 방향 괴리 감지 로직
+  const kospi = marketOverview.find((m: any) => m.label === "코스피");
+  const isMarketUp = kospi && (kospi.direction === "up" || kospi.direction === "상승");
+  const isMarketDown = kospi && (kospi.direction === "down" || kospi.direction === "하락");
+  
+  const macro = data.macroAnalysis || {
+    consecutiveDepositDecline: 0,
+    consecutiveCreditIncrease: 0,
+    creditMinMax: 0,
+    creditPercentile: 0,
+  };
+
+  const depDown = macro.consecutiveDepositDecline;
+  const credUp = macro.consecutiveCreditIncrease;
+
+  let gapAnalysis = {
+    title: "지수 vs 증시자금 괴리 분석",
+    statusTitle: "⚪ 중립: 자금 추이 모니터링",
+    description: "장세에 따른 자금 이탈 모니터링 중입니다.",
+    condition: "특이 이벤트 없음 (예탁금 2일 미만 감소 or 지수 보합/하락세이나 예탁금 감소 없음)",
+    status: "정상", // '정상', '주의', '경고', '위험'
+    color: "text-muted-foreground",
+    bgColor: "bg-muted/10",
+    borderColor: "border-border/30",
+    icon: TrendingUp
+  };
+
+  if (depDown >= 3 && credUp >= 1) {
+    gapAnalysis = {
+      title: "지수 vs 증시자금 괴리 분석",
+      statusTitle: "🔴 위험: 최악의 자금 괴리",
+      description: `현금(예탁금)은 ${depDown}일 연속 하락하는데 빚(신용)은 증가 중입니다. 레버리지 청산 압력이 매우 큽니다.`,
+      condition: "예탁금 3일 이상 연속 하락 & 신용잔고 1일 이상 연속 상승",
+      status: "위험",
+      color: "text-red-500",
+      bgColor: "bg-red-500/5",
+      borderColor: "border-red-500/30",
+      icon: ShieldAlert
+    };
+  } else if (depDown >= 5) {
+    gapAnalysis = {
+      title: "지수 vs 증시자금 괴리 분석",
+      statusTitle: "🔴 위험: 강력한 자금 이탈",
+      description: `예탁금이 ${depDown}일 연속 하락 중입니다. 시장 방향과 무관하게 투자 자금 이탈이 뚜렷합니다.`,
+      condition: "예탁금 5일 이상 연속 하락",
+      status: "위험",
+      color: "text-red-500",
+      bgColor: "bg-red-500/5",
+      borderColor: "border-red-500/30",
+      icon: ShieldAlert
+    };
+  } else if (depDown >= 3 && isMarketDown) {
+    gapAnalysis = {
+      title: "지수 vs 증시자금 괴리 분석",
+      statusTitle: "🟠 경고: 투자심리 위축",
+      description: `지수 하락과 함께 예탁금도 ${depDown}일 연속 하락 중입니다. 시장 분위기가 차갑게 위축되었습니다.`,
+      condition: "예탁금 3일 이상 연속 하락 & 코스피 지수 하락세",
+      status: "경고",
+      color: "text-orange-500",
+      bgColor: "bg-orange-500/5",
+      borderColor: "border-orange-500/30",
+      icon: AlertTriangle
+    };
+  } else if (depDown >= 3 && isMarketUp) {
+    gapAnalysis = {
+      title: "지수 vs 증시자금 괴리 분석",
+      statusTitle: "🟠 경고: 투자자 이탈 신호",
+      description: `지수는 상승 중이나 예탁금은 ${depDown}일 연속 하락했습니다. 겉보기와 달리 실질 자금이 유출 중입니다.`,
+      condition: "예탁금 3일 이상 연속 하락 & 코스피 지수 상승세",
+      status: "경고",
+      color: "text-orange-500",
+      bgColor: "bg-orange-500/5",
+      borderColor: "border-orange-500/30",
+      icon: AlertTriangle
+    };
+  } else if (depDown >= 2 && isMarketUp) {
+    gapAnalysis = {
+      title: "지수 vs 증시자금 괴리 분석",
+      statusTitle: "🟡 주의: 자금 이탈 초기",
+      description: `지수 상승에도 불구하고 예탁금이 2일 연속 하락했습니다. 수급 유출 흐름에 유의하세요.`,
+      condition: "예탁금 2일 연속 하락 & 코스피 지수 상승세",
+      status: "주의",
+      color: "text-yellow-500",
+      bgColor: "bg-yellow-500/5",
+      borderColor: "border-yellow-500/30",
+      icon: AlertCircle
+    };
+  } else if (isMarketUp) {
+    gapAnalysis = {
+      title: "지수 vs 증시자금 괴리 분석",
+      statusTitle: "🟢 정상: 선순환 흐름",
+      description: "지수가 상승하며 시장 자금이 정상적인 선순환 흐름을 보이고 있습니다.",
+      condition: "위의 모든 부정적 이탈 조건(연속 예탁금 감소)에 해당하지 않고, 지수가 상승세일 때",
+      status: "정상",
+      color: "text-emerald-500",
+      bgColor: "bg-emerald-500/5",
+      borderColor: "border-emerald-500/30",
+      icon: TrendingUp
+    };
+  }
 
   return (
     <div className="flex flex-col p-3 md:p-4 bg-background/40 rounded-xl border border-border/50 h-full hover:border-chart-3/30 transition-all">
@@ -209,138 +331,81 @@ export function CanaryCard({ data, onAnalyze }: Props) {
           </div>
         </div>
 
-        {/* 52-Week High (52주 신고가) - Moved below ADR */}
-        <div 
-          className={`p-2.5 md:p-3 bg-muted/20 rounded-lg relative overflow-hidden group border-l-2 border-stock-up/30 transition-all select-none ${
-            newHighCount >= 50 
-              ? "shadow-[0_0_12px_rgba(244,63,94,0.15)] border-stock-up/50 bg-stock-up/[0.04]" 
-              : newHighCount >= 20 
-              ? "shadow-[0_0_8px_rgba(244,63,94,0.08)] border-stock-up/40 bg-stock-up/[0.02]" 
-              : ""
-          }`}
-        >
-          {/* Subtle background pulse glow if count is high */}
-          {newHighCount >= 20 && (
-            <div className="absolute inset-0 bg-stock-up/5 animate-pulse pointer-events-none opacity-45" />
-          )}
-          
-          <div className="flex items-center justify-between mb-2 relative z-10 gap-1">
-            <div className="flex items-center gap-1.5">
-              <div className={`p-1 rounded-md shrink-0 ${newHighCount >= 20 ? 'bg-stock-up/20' : 'bg-stock-up/10'}`}>
-                  <TrendingUp className={`w-3.5 h-3.5 text-stock-up ${newHighCount >= 20 ? 'animate-bounce' : ''}`} />
-              </div>
-              <span className="text-[9px] md:text-[10px] text-muted-foreground font-bold">52주 신고가 종목 및 업종 분포</span>
+        {/* Leverage & Macro Risk Monitor Box (통합된 매크로 모니터) */}
+        <div className="pt-3 border-t border-border/20 space-y-4 relative z-10">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="p-1.5 bg-chart-4/10 rounded-md shrink-0">
+              <Activity className="w-4 h-4 text-chart-4" />
             </div>
-            {adrKospi?.time && (
-              <span className="text-[8px] text-muted-foreground font-mono opacity-80 shrink-0">
-                {getCleanDate(adrKospi.time)}
+            <span className="text-xs md:text-sm text-foreground font-extrabold tracking-tight">시장 레버리지 & 자금동향 모니터</span>
+          </div>
+
+          {/* Ratios Stacked (한 줄에 한 항목씩) */}
+          <div className="flex flex-col space-y-3">
+            {/* CD Ratio */}
+            <div className="space-y-2.5 p-3 bg-muted/10 rounded-lg border border-border/20 shadow-sm hover:border-chart-4/20 transition-all">
+              <div className="flex justify-between items-center text-xs md:text-sm font-bold text-muted-foreground">
+                <span>신용 / 예탁금 비율</span>
+                <span className={`font-mono text-sm md:text-base font-black ${cdStatus.textColor}`}>{cdRatio > 0 ? cdRatio.toFixed(1) : "0.0"}%</span>
+              </div>
+              <div className="w-full bg-zinc-800 h-2 rounded-full overflow-hidden border border-zinc-700/20">
+                <div className={`h-full rounded-full ${cdStatus.color}`} style={{ width: `${Math.min(cdRatio, 100)}%` }} />
+              </div>
+              <span className={`text-[11px] md:text-xs font-bold block leading-normal ${cdStatus.textColor}`}>{cdStatus.alert}</span>
+            </div>
+
+            {/* CM Ratio */}
+            <div className="space-y-2.5 p-3 bg-muted/10 rounded-lg border border-border/20 shadow-sm hover:border-chart-4/20 transition-all">
+              <div className="flex justify-between items-center text-xs md:text-sm font-bold text-muted-foreground">
+                <span>신용 / 시가총액 비율</span>
+                <span className={`font-mono text-sm md:text-base font-black ${cmStatus.textColor}`}>{cmRatio > 0 ? cmRatio.toFixed(2) : "0.00"}%</span>
+              </div>
+              <div className="w-full bg-zinc-800 h-2 rounded-full overflow-hidden border border-zinc-700/20">
+                <div className={`h-full rounded-full ${cmStatus.color}`} style={{ width: `${Math.min((cmRatio / 2) * 100, 100)}%` }} />
+              </div>
+              <span className={`text-[11px] md:text-xs font-bold block leading-normal ${cmStatus.textColor}`}>{cmStatus.alert}</span>
+            </div>
+          </div>
+
+          {/* Gap Analysis Box */}
+          <div className={`rounded-xl p-3 md:p-4 border shadow-md transition-all ${gapAnalysis.borderColor} ${gapAnalysis.bgColor}`}>
+            {/* Box Header - clearly recognized as a Title */}
+            <div className="flex items-center gap-2 pb-2.5 mb-2.5 border-b border-border/30">
+              <gapAnalysis.icon className={`w-4 h-4 ${gapAnalysis.color}`} />
+              <span className={`text-xs md:text-sm font-extrabold tracking-tight ${gapAnalysis.color}`}>
+                {gapAnalysis.title}
               </span>
+            </div>
+
+            {/* Status Display */}
+            <div className="flex items-center gap-1.5 mt-2">
+              <span className="text-xs md:text-sm font-extrabold text-foreground">
+                {gapAnalysis.statusTitle}
+              </span>
+            </div>
+
+            {/* Description */}
+            <p className="text-[11px] md:text-xs font-semibold leading-relaxed mt-2 text-muted-foreground">
+              {gapAnalysis.description}
+            </p>
+
+            {/* Trigger Condition Box */}
+            <div className="mt-3 p-2.5 bg-background/50 rounded-lg border border-border/20 shadow-inner">
+              <p className="text-[10px] md:text-[11px] font-semibold text-muted-foreground/90 leading-normal">
+                <span className="text-primary font-bold">발동 조건:</span> {gapAnalysis.condition}
+              </p>
+            </div>
+            
+            {macro.creditPercentile > 0 && (
+              <div className="mt-3 pt-2.5 border-t border-border/20 flex justify-between items-center text-[9px] md:text-[10px] text-muted-foreground/80 font-mono">
+                 <span>신용잔고 위치 (240일 기준)</span>
+                 <div className="flex items-center gap-1.5">
+                   <span title="역대 최저/최고 대비 %">MinMax: {macro.creditMinMax.toFixed(1)}%</span>
+                   <span className="text-primary font-bold animate-pulse" title="전체 영업일 중 현재 위치">상위: {(100 - macro.creditPercentile).toFixed(1)}%</span>
+                 </div>
+              </div>
             )}
           </div>
-          
-          <div className="flex items-baseline gap-1 relative z-10 mb-3 flex-wrap font-mono">
-            <span className="text-base md:text-lg font-black text-zinc-100 tracking-tighter">
-              🏆 {newHighCount}
-            </span>
-            <span className="text-[10px] font-bold text-zinc-400 ml-0.5">종목 달성</span>
-            <span className="text-[9px] text-zinc-500 font-bold whitespace-nowrap ml-2 font-sans">
-              ({newHighCount >= 50 
-                ? "🔥 극도로 강한 수급" 
-                : newHighCount >= 20 
-                ? "✨ 시장 활성화 국면" 
-                : "일부 주도주 중심 견인"})
-            </span>
-          </div>
-
-          {/* 주요 강세 업종 추가 (제한 없이 전체 표시) */}
-          {newHighSectors.length > 0 && (
-            <div className="pt-2 border-t border-border/30 relative z-10 space-y-1.5">
-              <span className="text-[9px] font-bold text-muted-foreground/80 block uppercase tracking-wider font-sans">업종별 신고가 분포</span>
-              <div className="flex flex-wrap gap-1.5 max-h-[300px] overflow-y-auto pr-1">
-                {newHighSectors.map((s, idx) => {
-                  const isOpened = activeSector?.sector === s.sector;
-                  return (
-                    <React.Fragment key={idx}>
-                      <span 
-                        className={`text-[9px] font-bold px-2 py-1 rounded-md active:scale-95 border flex items-center gap-1.5 cursor-pointer transition-all leading-none shadow-sm select-none ${
-                          isOpened 
-                            ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/50" 
-                            : "bg-zinc-800/85 hover:bg-zinc-750 border-zinc-700/40 text-zinc-200 hover:border-zinc-500"
-                        }`}
-                        title={`${s.sector} (${s.count}종목)`}
-                        onClick={() => {
-                          if (isOpened) {
-                            setActiveSector(null);
-                          } else {
-                            setActiveSector(s);
-                          }
-                        }}
-                      >
-                        <span>{s.sector}</span>
-                        <span className={`px-1.5 py-0.5 rounded text-[8px] font-black font-mono border ${
-                          isOpened 
-                            ? "bg-emerald-500/30 text-emerald-200 border-emerald-500/40" 
-                            : "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
-                        }`}>{s.count}</span>
-                      </span>
-                      
-                      {/* 클릭 시 아래 행에 강제 전개되는 100% 폭의 종목 리스트 박스 */}
-                      {isOpened && (
-                        <div className="w-full flex-shrink-0 flex-grow-0 my-1.5 px-3 py-2.5 bg-zinc-900/60 border border-zinc-850 hover:border-zinc-800 rounded-xl animate-in slide-in-from-top-1.5 duration-200 relative z-20">
-                          <div className="flex items-center gap-1.5 mb-2 pb-1.5 border-b border-border/20">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                            <span className="text-[9px] font-black text-zinc-300">{s.sector} 강세 주도주 목록</span>
-                          </div>
-                          {s.stocks && s.stocks.length > 0 ? (
-                            <div className="flex flex-wrap gap-1.5">
-                              {s.stocks.map((stock, sIdx) => (
-                                <span 
-                                  key={`${stock.code}-${sIdx}`}
-                                  onClick={(e) => {
-                                    setConfirmState({ x: e.clientX, y: e.clientY, code: stock.code, name: stock.name });
-                                  }}
-                                  className="px-2 py-1 text-[9px] font-bold bg-zinc-800/60 border border-zinc-700/30 hover:border-yellow-500/50 hover:text-yellow-400 active:scale-95 rounded-md cursor-pointer transition-all select-none group flex items-center gap-1"
-                                >
-                                  <span>{stock.name}</span>
-                                  <span className="text-[7.5px] font-bold font-mono text-zinc-500 group-hover:text-zinc-400 transition-colors px-1 py-0.2 bg-zinc-950/80 border border-zinc-850/50 rounded">
-                                    {stock.code}
-                                  </span>
-                                </span>
-                              ))}
-                            </div>
-                          ) : (
-                            <div className="text-[8.5px] text-muted-foreground italic py-1">
-                              해당 업종에 소속된 신고가 종목 데이터가 없습니다.
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </React.Fragment>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Bottom Row: New High Trend Mini Chart */}
-        <div className="pt-2">
-            <span className="text-[9px] text-muted-foreground font-bold mb-2 block uppercase tracking-wider">신고가 영업일 5일간 추이</span>
-            <div className="flex items-end justify-between gap-1.5 md:gap-2 h-10 md:h-12 px-1">
-                {highTrend.map((h, i) => {
-                    const max = Math.max(...highTrend.map(x => x.count), 1);
-                    const height = (h.count / max) * 100;
-                    return (
-                        <div key={i} className="flex flex-col items-center flex-1 gap-1 group">
-                            <div 
-                                className={`w-full rounded-t-sm transition-all duration-300 ${i === highTrend.length - 1 ? 'bg-stock-up shadow-[0_0_8px_rgba(239,68,68,0.4)]' : 'bg-stock-up/30 group-hover:bg-stock-up/50'}`} 
-                                style={{ height: `${Math.max(10, height)}%` }}
-                            ></div>
-                            <span className="text-[7px] text-muted-foreground font-mono">{h.date}</span>
-                        </div>
-                    );
-                })}
-            </div>
         </div>
       </div>
 
@@ -368,7 +433,6 @@ export function CanaryCard({ data, onAnalyze }: Props) {
                 onClick={() => {
                   onAnalyze?.(confirmState.code, confirmState.name);
                   setConfirmState(null);
-                  setActiveSector(null); // 모달도 닫기
                 }}
                 className="flex-1 bg-primary text-primary-foreground text-[10px] font-black py-1.5 rounded-md hover:bg-primary/90 transition-all shadow-md active:scale-95"
               >YES</button>
@@ -397,7 +461,6 @@ export function CanaryCard({ data, onAnalyze }: Props) {
                 onClick={() => {
                   onAnalyze?.(confirmState.code, confirmState.name);
                   setConfirmState(null);
-                  setActiveSector(null); // 모달도 닫기
                 }}
                 className="flex-1 bg-primary text-primary-foreground text-sm font-black py-3 rounded-xl hover:bg-primary/90 transition-all shadow-lg shadow-primary/20 active:scale-[0.98]"
               >AI 분석 시작</button>

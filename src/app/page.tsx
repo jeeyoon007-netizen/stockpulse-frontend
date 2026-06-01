@@ -41,7 +41,6 @@ import { TradingViewChart } from "@/components/tradingview-chart";
 import { FearGreedGauge } from "@/components/fear-greed-gauge";
 import { CanaryCard } from "@/components/canary-card";
 import { InvestorFlowCard } from "@/components/investor-flow-card";
-import { MacroIndicators } from "@/components/macro-indicators";
 import { WatchlistButton } from "@/components/ui/watchlist-button";
 import { type FearGreedResponse } from "@/lib/api/feargreed";
 import { type IndexPriceData } from "@/lib/api/kis-market";
@@ -104,8 +103,6 @@ export default function DashboardPage() {
     creditHistory: [], 
     adrKospi: null,
     adrKosdaq: null,
-    newHighCount: 0,
-    highTrend: []
   });
 
   const [backtestTrades, setBacktestTrades] = useState<any[]>([]);
@@ -643,6 +640,7 @@ export default function DashboardPage() {
         <div className="flex flex-col h-full animate-in fade-in slide-in-from-left-4 duration-500 delay-100">
            <CanaryCard 
              data={canaryData} 
+             marketOverview={marketOverview}
              onAnalyze={(code, name) => {
                setStockCode(code);
                setSearchInput(name);
@@ -675,11 +673,6 @@ export default function DashboardPage() {
              }} 
            />
         </div>
-      </section>
-
-      {/* --- [Macro Indicators Section: Ratios and Gap Analysis] --- */}
-      <section id="macro-indicators" className="mt-8 animate-in fade-in slide-in-from-bottom-6 duration-500 delay-400">
-         <MacroIndicators canaryData={canaryData} marketOverview={marketOverview} />
       </section>
 
     </div>
