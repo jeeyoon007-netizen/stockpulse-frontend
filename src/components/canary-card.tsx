@@ -1,8 +1,8 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { type MarketFundsData, type CreditBalanceData } from "@/lib/api/kis-market";
-import { TrendingUp, TrendingDown, Minus, Wallet, CreditCard, Activity } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, Wallet, CreditCard, Activity, X, Bot } from "lucide-react";
 
 interface Props {
   data: {
@@ -19,13 +19,16 @@ interface Props {
       signal: string;
     } | null;
     newHighCount?: number;
-    newHighSectors?: { sector: string; count: number }[];
+    newHighSectors?: { sector: string; count: number; stocks?: { name: string; code: string }[] }[];
     highTrend?: { date: string, count: number }[];
   };
+  onAnalyze?: (code: string, name: string) => void;
 }
 
-export function CanaryCard({ data }: Props) {
+export function CanaryCard({ data, onAnalyze }: Props) {
   const { funds, creditHistory, adrKospi, adrKosdaq, newHighCount = 0, newHighSectors = [], highTrend = [] } = data;
+  const [activeSector, setActiveSector] = useState<{ sector: string; count: number; stocks?: { name: string; code: string }[] } | null>(null);
+  const [confirmState, setConfirmState] = useState<{ x: number, y: number, code: string, name: string } | null>(null);
   
   // Format Large Money (KRW 억/조)
   const formatMoney = (val: number) => {
@@ -253,17 +256,68 @@ export function CanaryCard({ data }: Props) {
           {newHighSectors.length > 0 && (
             <div className="pt-2 border-t border-border/30 relative z-10 space-y-1.5">
               <span className="text-[9px] font-bold text-muted-foreground/80 block uppercase tracking-wider font-sans">업종별 신고가 분포</span>
-              <div className="flex flex-wrap gap-1.5 max-h-[120px] overflow-y-auto pr-1">
-                {newHighSectors.map((s, idx) => (
-                  <span 
-                    key={idx} 
-                    className="text-[9px] font-bold px-2 py-1 rounded-md bg-zinc-800/80 hover:bg-zinc-800 border border-zinc-700/40 text-zinc-200 flex items-center gap-1.5 hover:border-zinc-600 transition-all leading-none shadow-sm"
-                    title={`${s.sector} (${s.count}종목)`}
-                  >
-                    <span>{s.sector}</span>
-                    <span className="bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.5 rounded text-[8px] font-black font-mono">{s.count}</span>
-                  </span>
-                ))}
+              <div className="flex flex-wrap gap-1.5 max-h-[300px] overflow-y-auto pr-1">
+                {newHighSectors.map((s, idx) => {
+                  const isOpened = activeSector?.sector === s.sector;
+                  return (
+                    <React.Fragment key={idx}>
+                      <span 
+                        className={`text-[9px] font-bold px-2 py-1 rounded-md active:scale-95 border flex items-center gap-1.5 cursor-pointer transition-all leading-none shadow-sm select-none ${
+                          isOpened 
+                            ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/50" 
+                            : "bg-zinc-800/85 hover:bg-zinc-750 border-zinc-700/40 text-zinc-200 hover:border-zinc-500"
+                        }`}
+                        title={`${s.sector} (${s.count}종목)`}
+                        onClick={() => {
+                          if (isOpened) {
+                            setActiveSector(null);
+                          } else {
+                            setActiveSector(s);
+                          }
+                        }}
+                      >
+                        <span>{s.sector}</span>
+                        <span className={`px-1.5 py-0.5 rounded text-[8px] font-black font-mono border ${
+                          isOpened 
+                            ? "bg-emerald-500/30 text-emerald-200 border-emerald-500/40" 
+                            : "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
+                        }`}>{s.count}</span>
+                      </span>
+                      
+                      {/* 클릭 시 아래 행에 강제 전개되는 100% 폭의 종목 리스트 박스 */}
+                      {isOpened && (
+                        <div className="w-full flex-shrink-0 flex-grow-0 my-1.5 px-3 py-2.5 bg-zinc-900/60 border border-zinc-850 hover:border-zinc-800 rounded-xl animate-in slide-in-from-top-1.5 duration-200 relative z-20">
+                          <div className="flex items-center gap-1.5 mb-2 pb-1.5 border-b border-border/20">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                            <span className="text-[9px] font-black text-zinc-300">{s.sector} 강세 주도주 목록</span>
+                          </div>
+                          {s.stocks && s.stocks.length > 0 ? (
+                            <div className="flex flex-wrap gap-1.5">
+                              {s.stocks.map((stock, sIdx) => (
+                                <span 
+                                  key={`${stock.code}-${sIdx}`}
+                                  onClick={(e) => {
+                                    setConfirmState({ x: e.clientX, y: e.clientY, code: stock.code, name: stock.name });
+                                  }}
+                                  className="px-2 py-1 text-[9px] font-bold bg-zinc-800/60 border border-zinc-700/30 hover:border-yellow-500/50 hover:text-yellow-400 active:scale-95 rounded-md cursor-pointer transition-all select-none group flex items-center gap-1"
+                                >
+                                  <span>{stock.name}</span>
+                                  <span className="text-[7.5px] font-bold font-mono text-zinc-500 group-hover:text-zinc-400 transition-colors px-1 py-0.2 bg-zinc-950/80 border border-zinc-850/50 rounded">
+                                    {stock.code}
+                                  </span>
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="text-[8.5px] text-muted-foreground italic py-1">
+                              해당 업종에 소속된 신고가 종목 데이터가 없습니다.
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -289,6 +343,83 @@ export function CanaryCard({ data }: Props) {
             </div>
         </div>
       </div>
+
+
+      {/* Confirm Popup: Desktop = mouse-following / Mobile = bottom sheet */}
+      {confirmState && (
+        <>
+          {/* Desktop popup (mouse-following) */}
+          <div 
+            className="hidden md:block fixed z-[9999] bg-background/95 backdrop-blur-xl border border-primary/30 rounded-xl shadow-2xl p-4 min-w-[220px] animate-in zoom-in-95 fade-in duration-200"
+            style={{ 
+              left: confirmState.x + 10, 
+              top: Math.min(confirmState.y + 10, typeof window !== 'undefined' ? window.innerHeight - 150 : confirmState.y) 
+            }}
+          >
+            <div className="flex items-center gap-2 mb-3">
+              <Bot className="w-4 h-4 text-primary" />
+              <span className="text-xs font-bold text-foreground">종목 분석을 할까요?</span>
+            </div>
+            <p className="text-[11px] font-bold text-muted-foreground mb-4">
+              [{confirmState.name}] AI 심층 분석 리포트를 생성하시겠습니까?
+            </p>
+            <div className="flex gap-2">
+              <button 
+                onClick={() => {
+                  onAnalyze?.(confirmState.code, confirmState.name);
+                  setConfirmState(null);
+                  setActiveSector(null); // 모달도 닫기
+                }}
+                className="flex-1 bg-primary text-primary-foreground text-[10px] font-black py-1.5 rounded-md hover:bg-primary/90 transition-all shadow-md active:scale-95"
+              >YES</button>
+              <button 
+                onClick={() => setConfirmState(null)}
+                className="px-3 bg-muted text-muted-foreground text-[10px] font-bold py-1.5 rounded-md hover:bg-muted/70 transition-all"
+              >NO</button>
+            </div>
+            <div className="absolute -top-2 left-4 w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-b-[8px] border-b-primary/30" />
+          </div>
+
+          {/* Mobile bottom sheet popup */}
+          <div className="md:hidden fixed z-[9999] bottom-0 left-0 right-0 bg-background/98 backdrop-blur-2xl border-t border-primary/30 rounded-t-2xl shadow-2xl p-5 animate-in slide-in-from-bottom duration-300" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 20px)' }}>
+            <div className="w-10 h-1 bg-muted-foreground/30 rounded-full mx-auto mb-4" />
+            <div className="flex items-center gap-3 mb-3">
+              <div className="p-2 bg-primary/10 rounded-lg">
+                <Bot className="w-5 h-5 text-primary" />
+              </div>
+              <span className="text-sm font-bold text-foreground">종목 분석을 할까요?</span>
+            </div>
+            <p className="text-xs font-bold text-muted-foreground mb-5">
+              [{confirmState.name}] AI 심층 분석 리포트를 생성하시겠습니까?
+            </p>
+            <div className="flex gap-3">
+              <button 
+                onClick={() => {
+                  onAnalyze?.(confirmState.code, confirmState.name);
+                  setConfirmState(null);
+                  setActiveSector(null); // 모달도 닫기
+                }}
+                className="flex-1 bg-primary text-primary-foreground text-sm font-black py-3 rounded-xl hover:bg-primary/90 transition-all shadow-lg shadow-primary/20 active:scale-[0.98]"
+              >AI 분석 시작</button>
+              <button 
+                onClick={() => setConfirmState(null)}
+                className="px-5 bg-muted text-muted-foreground text-sm font-bold py-3 rounded-xl hover:bg-muted/70 transition-all"
+              >취소</button>
+            </div>
+          </div>
+        </>
+      )}
+      
+      {/* Background overlay to close popup on click outside */}
+      {confirmState && (
+        <div 
+          className="fixed inset-0 z-[9998] bg-transparent" 
+          onClick={(e) => {
+            e.stopPropagation();
+            setConfirmState(null);
+          }}
+        />
+      )}
     </div>
   );
 }

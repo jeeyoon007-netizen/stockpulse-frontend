@@ -639,7 +639,14 @@ export default function DashboardPage() {
       <section id="market-indicators" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
         {/* [Canary] */}
         <div className="flex flex-col h-full animate-in fade-in slide-in-from-left-4 duration-500 delay-100">
-           <CanaryCard data={canaryData} />
+           <CanaryCard 
+             data={canaryData} 
+             onAnalyze={(code, name) => {
+               setStockCode(code);
+               setSearchInput(name);
+               handleAnalyze(code);
+             }}
+           />
         </div>
 
         {/* [Temperature] */}
