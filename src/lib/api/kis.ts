@@ -260,7 +260,7 @@ export async function fetchStockOHLCV(code: string, daysRequired = 240): Promise
 
   return {
     code,
-    name: "검색된 종목",
+    name: "",
     currentPrice,
     change,
     changePercent: parseFloat(changePercent.toFixed(2)),

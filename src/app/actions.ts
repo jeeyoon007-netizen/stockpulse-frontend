@@ -219,14 +219,14 @@ export async function fetchMarketOverviewAction(): Promise<IndexPriceData[]> {
   }
 }
 
-export async function analyzeStockAction(code: string, mode: AnalysisMode = "scalp"): Promise<StockAnalysisResponse> {
+export async function analyzeStockAction(code: string, mode: AnalysisMode = "scalp", stockName?: string): Promise<StockAnalysisResponse> {
   try {
     const res = await fetch(`${BACKEND_URL}/api/v1/analysis/run`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ code, mode }),
+      body: JSON.stringify({ code, mode, stock_name: stockName }),
       cache: 'no-store'
     });
 

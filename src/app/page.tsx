@@ -215,7 +215,9 @@ export default function DashboardPage() {
     }, 1200);
 
     try {
-      const result = await analyzeStockAction(finalCode, activeMode);
+      // 프론트엔드 마스터 데이터에서 종목명을 찾아 백엔드에 전달 (백엔드 stocks.json 의존 제거)
+      const stockMatch = stocks.find(s => s.code === finalCode);
+      const result = await analyzeStockAction(finalCode, activeMode, stockMatch?.name);
       setAnalysisResult(result);
     } catch (error) {
       console.error(error);
