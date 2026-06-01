@@ -211,11 +211,11 @@ export function CanaryCard({ data, marketOverview, onAnalyze }: Props) {
   return (
     <div className="flex flex-col p-3 md:p-4 bg-background/40 rounded-xl border border-border/50 h-full hover:border-chart-3/30 transition-all">
       <div className="flex justify-between items-center mb-4 md:mb-6">
-        <h3 className="text-xs md:text-sm font-medium text-muted-foreground flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-chart-3 animate-pulse"></span>
+        <h3 className="text-xs md:text-sm font-extrabold text-foreground tracking-tight flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-orange-500 animate-pulse shadow-[0_0_8px_rgba(249,115,22,0.8)]"></span>
             카나리아 (시장 자금 & 심리)
         </h3>
-        <span className="text-[9px] text-muted-foreground/80 font-mono bg-muted/30 border border-border/30 px-2 py-0.5 rounded shadow-sm">
+        <span className="text-[10px] text-muted-foreground/90 font-mono bg-muted/40 border border-border/40 px-2 py-0.5 rounded shadow-sm font-bold">
             실시간 모니터링 중
         </span>
       </div>
@@ -224,59 +224,59 @@ export function CanaryCard({ data, marketOverview, onAnalyze }: Props) {
         {/* Top Row Grid: Customer Deposit & Credit Balance */}
         <div className="grid grid-cols-2 gap-2 md:gap-3">
             {/* Deposit */}
-            <div className="p-2.5 md:p-3 bg-muted/20 rounded-lg relative overflow-hidden group">
-              <div className="flex items-center justify-between gap-1 mb-1">
+            <div className="p-3 md:p-3.5 bg-muted/20 rounded-lg relative overflow-hidden group border border-border/20 shadow-sm">
+              <div className="flex items-center justify-between gap-1 mb-1.5">
                 <div className="flex items-center gap-1.5">
                   <div className="p-1 bg-chart-1/10 rounded-md shrink-0">
-                      <Wallet className="w-3.5 h-3.5 text-chart-1" />
+                      <Wallet className="w-4 h-4 text-chart-1" />
                   </div>
-                  <span className="text-[9px] md:text-[10px] text-muted-foreground font-bold">고객예탁금</span>
+                  <span className="text-[10px] md:text-xs text-foreground/90 font-extrabold">고객예탁금</span>
                 </div>
                 {funds?.date && (
-                  <span className="text-[8px] text-muted-foreground font-mono opacity-80 shrink-0">
+                  <span className="text-[9px] text-muted-foreground/80 font-mono font-bold shrink-0">
                     {formatDateLabel(funds.date)}
                   </span>
                 )}
               </div>
               <div className="flex items-baseline gap-1">
-                <span className="text-base md:text-lg font-black tracking-tighter font-mono">
+                <span className="text-lg md:text-xl font-black tracking-tighter font-mono text-foreground">
                     {funds ? formatMoney(Math.round(funds.deposit / 100000000)) : "---"}
                 </span>
-                <span className="text-[8px] font-bold text-muted-foreground">원</span>
+                <span className="text-[10px] font-black text-muted-foreground/90">원</span>
               </div>
             </div>
 
             {/* Credit Balance */}
-            <div className={`p-2.5 md:p-3 rounded-lg relative overflow-hidden group transition-all ${
+            <div className={`p-3 md:p-3.5 rounded-lg relative overflow-hidden group transition-all border shadow-sm ${
               isCreditAlert
-                ? 'bg-amber-500/[0.06] border-l-2 border-amber-500/50'
-                : 'bg-muted/20'
+                ? 'bg-amber-500/[0.06] border-amber-500/50 border-l-2'
+                : 'bg-muted/20 border-border/20'
             }`}>
               {isCreditAlert && (
                 <div className="absolute inset-0 bg-amber-500/5 animate-pulse pointer-events-none" />
               )}
-              <div className="flex items-center justify-between gap-1 mb-1 relative z-10">
+              <div className="flex items-center justify-between gap-1 mb-1.5 relative z-10">
                 <div className="flex items-center gap-1.5">
                   <div className={`p-1 rounded-md shrink-0 ${isCreditAlert ? 'bg-amber-500/20' : 'bg-chart-5/10'}`}>
-                      <CreditCard className={`w-3.5 h-3.5 ${isCreditAlert ? 'text-amber-400' : 'text-chart-5'}`} />
+                      <CreditCard className={`w-4 h-4 ${isCreditAlert ? 'text-amber-400' : 'text-chart-5'}`} />
                   </div>
-                  <span className="text-[9px] md:text-[10px] text-muted-foreground font-bold">신용잔고</span>
+                  <span className="text-[10px] md:text-xs text-foreground/90 font-extrabold">신용잔고</span>
                 </div>
                 {latestCredit?.date && (
-                  <span className="text-[8px] text-muted-foreground font-mono opacity-80 shrink-0">
+                  <span className="text-[9px] text-muted-foreground/80 font-mono font-bold shrink-0">
                     {formatDateLabel(latestCredit.date)}
                   </span>
                 )}
               </div>
               <div className="flex items-baseline gap-1 relative z-10 flex-wrap">
-                <span className="text-base md:text-lg font-black tracking-tighter font-mono">
+                <span className="text-lg md:text-xl font-black tracking-tighter font-mono text-foreground">
                     {latestCredit ? (latestCredit.amount / 1000000000000).toFixed(1) : "---"}
                 </span>
-                <span className="text-[8px] font-bold text-muted-foreground">조원</span>
+                <span className="text-[10px] font-black text-muted-foreground/90">조원</span>
                 {latestCredit && prevCredit && (
                   <div className="flex items-center gap-0.5 ml-auto shrink-0 bg-background/40 px-1 py-0.5 rounded border border-border/20">
                     {getCreditTrendIcon(latestCredit.amount, prevCredit.amount)}
-                    <span className={`text-[8px] font-bold ${
+                    <span className={`text-[9px] font-black ${
                       latestCredit.amount >= prevCredit.amount ? 'text-amber-500' : 'text-stock-up'
                     }`}>
                         {latestCredit.ratio}%
@@ -288,42 +288,42 @@ export function CanaryCard({ data, marketOverview, onAnalyze }: Props) {
         </div>
 
         {/* Middle Row: ADR (Advance Decline Ratio) */}
-        <div className="p-2.5 md:p-3 bg-muted/20 rounded-lg relative overflow-hidden group">
-          <div className="flex items-center gap-3 mb-2">
+        <div className="p-3 md:p-4 bg-muted/20 rounded-lg relative overflow-hidden group border border-border/20 shadow-sm">
+          <div className="flex items-center gap-3 mb-3">
             <div className="p-2 bg-chart-2/10 rounded-md">
                 <Activity className="w-4 h-4 text-chart-2" />
             </div>
-            <span className="text-xs text-muted-foreground font-bold">ADR (등락비율)</span>
+            <span className="text-xs md:text-sm text-foreground font-extrabold tracking-tight">ADR (등락비율)</span>
           </div>
           
-          <div className="space-y-3">
+          <div className="space-y-4">
             {/* KOSPI ADR */}
-            <div className="flex flex-col gap-0.5 border-b border-border/20 pb-2">
+            <div className="flex flex-col gap-1 border-b border-border/20 pb-3">
               <div className="flex justify-between items-center">
-                <span className="text-[10px] font-bold text-muted-foreground">KOSPI</span>
-                <span className="text-[8px] text-muted-foreground font-mono">{adrKospi?.time || "---"}</span>
+                <span className="text-[11px] md:text-xs font-extrabold text-foreground/80">KOSPI</span>
+                <span className="text-[9px] md:text-[10px] text-muted-foreground/80 font-mono font-bold">{adrKospi?.time || "---"}</span>
               </div>
               <div className="flex items-baseline gap-2">
-                <span className="text-sm md:text-base font-black tracking-tighter font-mono">
+                <span className="text-base md:text-lg font-black tracking-tighter font-mono text-foreground">
                   {adrKospi ? Number(adrKospi.adr).toFixed(2) : "---"}%
                 </span>
-                <span className={`text-[9px] font-bold ${getSignalColor(adrKospi?.signal || "")}`}>
+                <span className={`text-[10.5px] md:text-xs font-black ${getSignalColor(adrKospi?.signal || "")}`}>
                   {adrKospi?.signal || "---"}
                 </span>
               </div>
             </div>
 
             {/* KOSDAQ ADR */}
-            <div className="flex flex-col gap-0.5">
+            <div className="flex flex-col gap-1">
               <div className="flex justify-between items-center">
-                <span className="text-[10px] font-bold text-muted-foreground">KOSDAQ</span>
-                <span className="text-[8px] text-muted-foreground font-mono">{adrKosdaq?.time || "---"}</span>
+                <span className="text-[11px] md:text-xs font-extrabold text-foreground/80">KOSDAQ</span>
+                <span className="text-[9px] md:text-[10px] text-muted-foreground/80 font-mono font-bold">{adrKosdaq?.time || "---"}</span>
               </div>
               <div className="flex items-baseline gap-2">
-                <span className="text-sm md:text-base font-black tracking-tighter font-mono">
+                <span className="text-base md:text-lg font-black tracking-tighter font-mono text-foreground">
                   {adrKosdaq ? Number(adrKosdaq.adr).toFixed(2) : "---"}%
                 </span>
-                <span className={`text-[9px] font-bold ${getSignalColor(adrKosdaq?.signal || "")}`}>
+                <span className={`text-[10.5px] md:text-xs font-black ${getSignalColor(adrKosdaq?.signal || "")}`}>
                   {adrKosdaq?.signal || "---"}
                 </span>
               </div>

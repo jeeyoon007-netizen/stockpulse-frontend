@@ -25,7 +25,10 @@ export function FearGreedGauge({ data, title }: Props) {
 
   return (
     <div className="flex flex-col items-center p-3 md:p-4 bg-background/40 rounded-xl border border-border/50 relative overflow-hidden group hover:border-primary/30 transition-all duration-300">
-      <h3 className="text-xs md:text-sm font-medium text-muted-foreground mb-3 md:mb-4">{title}</h3>
+      <h3 className="text-xs md:text-sm font-extrabold text-foreground tracking-tight mb-3 md:mb-4 text-center uppercase flex items-center gap-1.5">
+        <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: color }} />
+        {title}
+      </h3>
       
       <div className="relative w-36 h-[72px] md:w-48 md:h-24 mb-4 md:mb-6">
         {/* Gauge Background (Semi-circle) */}
@@ -74,11 +77,11 @@ export function FearGreedGauge({ data, title }: Props) {
       </div>
       
       {/* Indicators List (Small) */}
-      <div className="grid grid-cols-2 gap-x-3 md:gap-x-4 gap-y-1.5 md:gap-y-2 mt-4 md:mt-6 w-full opacity-80 md:opacity-60 group-hover:opacity-100 transition-opacity">
+      <div className="grid grid-cols-2 gap-x-3 md:gap-x-4 gap-y-2 mt-4 md:mt-6 w-full opacity-95 md:opacity-90 group-hover:opacity-100 transition-opacity">
         {data.indicators.slice(0, 4).map((ind, i) => (
-          <div key={i} className="flex justify-between items-center text-[10px]">
+          <div key={i} className="flex justify-between items-center text-[10.5px] md:text-xs font-semibold py-0.5 border-b border-border/10 pb-1">
             <span className="text-muted-foreground truncate mr-2">{ind.name}</span>
-            <span className="font-mono font-bold">{ind.raw ?? ind.value}{ind.unit ?? ""}</span>
+            <span className="font-mono font-black text-foreground">{ind.raw ?? ind.value}{ind.unit ?? ""}</span>
           </div>
         ))}
       </div>

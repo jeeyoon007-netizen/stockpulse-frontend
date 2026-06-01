@@ -32,30 +32,30 @@ export function InvestorFlowCard({ onAnalyze }: { onAnalyze?: (code: string, nam
 
   const StockList = ({ title, data, icon: Icon, color }: { title: string, data: InvestorFlowData[], icon: any, color: string }) => (
     <div className="flex-1 flex flex-col min-w-0">
-        <div className={`flex items-center gap-2 mb-2 px-1 py-1 rounded border-l-2 bg-gradient-to-r from-muted/50 to-transparent ${color.replace('text-', 'border-')}`}>
-            <Icon className={`w-3 h-3 ${color}`} />
-            <span className="text-[10px] font-black uppercase tracking-tight">{title} Top 10</span>
+        <div className={`flex items-center gap-2 mb-2 px-1.5 py-1.5 rounded border-l-2 bg-gradient-to-r from-muted/50 to-transparent ${color.replace('text-', 'border-')}`}>
+            <Icon className={`w-3.5 h-3.5 ${color}`} />
+            <span className="text-[11px] md:text-xs font-extrabold uppercase tracking-tight text-foreground">{title} Top 10</span>
         </div>
-        <div className="space-y-0.5">
+        <div className="space-y-1">
             {data.map((item, idx) => (
                 <div 
                   key={`${item.code}-${idx}`} 
-                  className="flex justify-between items-center py-1.5 px-2 hover:bg-yellow-500/10 rounded-md transition-all group cursor-pointer border-l-2 border-transparent hover:border-yellow-500"
+                  className="flex justify-between items-center py-2 px-2.5 hover:bg-yellow-500/10 rounded-md transition-all group cursor-pointer border-l-2 border-transparent hover:border-yellow-500"
                   onClick={(e) => handleStockClick(e, item.code, item.name)}
                 >
-                    <div className="flex items-center gap-2 min-w-0">
-                        <span className="text-[9px] text-muted-foreground font-mono w-3 shrink-0">{idx + 1}</span>
+                    <div className="flex items-center gap-2.5 min-w-0">
+                        <span className="text-[10px] md:text-[11px] text-muted-foreground/80 font-mono font-bold w-3.5 shrink-0">{idx + 1}</span>
                         <div className="flex flex-col min-w-0">
-                            <span className="text-[10.5px] font-bold truncate max-w-[95px]">{item.name}</span>
+                            <span className="text-[11.5px] md:text-xs font-extrabold text-foreground truncate max-w-[95px]">{item.name}</span>
                             {item.badge && item.badge !== "" && (
-                                <span className="text-amber-400 text-[9px] font-bold truncate max-w-[110px] leading-tight mt-0.5" title={item.badge}>
+                                <span className="text-amber-400 text-[9px] md:text-[10px] font-bold truncate max-w-[110px] leading-tight mt-0.5" title={item.badge}>
                                     {item.badge}
                                 </span>
                             )}
                         </div>
                     </div>
-                    <div className="flex flex-col items-end">
-                        <span className={`text-[10px] font-black ${color}`}>{formatAmount(item.amount)}</span>
+                    <div className="flex flex-col items-end shrink-0">
+                        <span className={`text-[11px] md:text-xs font-black ${color}`}>{formatAmount(item.amount)}</span>
                     </div>
                 </div>
             ))}
@@ -66,7 +66,7 @@ export function InvestorFlowCard({ onAnalyze }: { onAnalyze?: (code: string, nam
   return (
     <div className="flex flex-col p-4 bg-background/40 rounded-xl border border-border/50 h-full overflow-hidden hover:border-chart-2/30 transition-all group relative">
       <div className="flex justify-between items-center mb-5">
-        <h3 className="text-sm font-bold text-muted-foreground flex items-center gap-2 tracking-tight">
+        <h3 className="text-xs md:text-sm font-extrabold text-foreground tracking-tight flex items-center gap-2">
             <Users className="w-4 h-4 text-chart-2" />
             수급 입체 분석 (Top 10)
         </h3>
@@ -102,64 +102,64 @@ export function InvestorFlowCard({ onAnalyze }: { onAnalyze?: (code: string, nam
 
                 {/* Supply & Demand Features (수급 특징) */}
                 <div className="bg-background/60 rounded-xl border border-border/60 p-4 space-y-4 shadow-sm">
-                    <div className="flex items-center gap-2 pb-2 border-b border-border/30">
+                    <div className="flex items-center gap-2 pb-2.5 border-b border-border/30">
                         <Zap className="w-4 h-4 text-primary" />
-                        <span className="text-[11px] font-black uppercase tracking-widest text-primary">수급 핵심 특징주 (INSIGHT)</span>
+                        <span className="text-xs md:text-sm font-extrabold tracking-tight text-primary">수급 핵심 특징주 (INSIGHT)</span>
                     </div>
 
-                    <div className="grid grid-cols-1 gap-3">
+                    <div className="grid grid-cols-1 gap-4">
                         {/* Overlap */}
-                        <div className="flex flex-col gap-1">
-                            <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground mb-1">
-                                <Target className="w-3 h-3 text-stock-up" />
+                        <div className="flex flex-col gap-1.5">
+                            <div className="flex items-center gap-2 text-[11px] md:text-xs font-extrabold text-foreground/95 mb-1">
+                                <Target className="w-3.5 h-3.5 text-stock-up" />
                                 <span>양매수 동시 포착 종목</span>
                             </div>
-                            <div className="flex flex-wrap gap-1.5 ">
+                            <div className="flex flex-wrap gap-2">
                                 {analysis.overlap.length > 0 ? analysis.overlap.map((item: {name: string, code: string, badge?: string}, idx: number) => (
                                     <span 
                                       key={`${item.code}-${idx}`} 
                                       title={item.badge || "양매수 동시 포착 종목"}
-                                      className="px-2 py-0.5 bg-stock-up/10 text-stock-up text-[10px] font-bold rounded-full border border-stock-up/20 cursor-pointer hover:bg-stock-up/20 transition-all flex items-center gap-1 select-none"
+                                      className="px-2.5 py-1 bg-stock-up/10 text-stock-up text-[10.5px] md:text-xs font-black rounded-full border border-stock-up/20 cursor-pointer hover:bg-stock-up/20 transition-all flex items-center gap-1 select-none"
                                       onClick={(e) => handleStockClick(e, item.code, item.name)}
                                     >
                                         {item.name}
-                                        {item.badge && <span className="text-[8px] opacity-80" aria-label="badge indicator">🔥</span>}
+                                        {item.badge && <span className="text-[9px] opacity-80" aria-label="badge indicator">🔥</span>}
                                     </span>
-                                )) : <span className="text-[10px] text-muted-foreground italic">포착된 종목 없음</span>}
+                                )) : <span className="text-[10.5px] md:text-xs text-muted-foreground italic">포착된 종목 없음</span>}
                             </div>
                         </div>
 
                         {/* Dominant Industry */}
-                        <div className="flex flex-col gap-1">
-                            <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground mb-1">
-                                <Search className="w-3 h-3 text-primary" />
+                        <div className="flex flex-col gap-1.5">
+                            <div className="flex items-center gap-2 text-[11px] md:text-xs font-extrabold text-foreground/95 mb-1">
+                                <Search className="w-3.5 h-3.5 text-primary" />
                                 <span>주도 산업군 (섹터)</span>
                             </div>
-                            <div className="flex flex-wrap gap-1.5">
+                            <div className="flex flex-wrap gap-2">
                                 {analysis.dominantIndustries.map((name: string, idx: number) => (
-                                    <span key={`${name}-${idx}`} className="px-2 py-0.5 bg-primary/10 text-primary text-[10px] font-bold rounded-full border border-primary/20">{name}</span>
+                                    <span key={`${name}-${idx}`} className="px-2.5 py-1 bg-primary/10 text-primary text-[10.5px] md:text-xs font-black rounded-full border border-primary/20">{name}</span>
                                 ))}
                             </div>
                         </div>
 
                         {/* High Turnover */}
-                        <div className="flex flex-col gap-1">
-                            <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground mb-1">
-                                <Activity className="w-3 h-3 text-amber-500" />
+                        <div className="flex flex-col gap-1.5">
+                            <div className="flex items-center gap-2 text-[11px] md:text-xs font-extrabold text-foreground/95 mb-1">
+                                <Activity className="w-3.5 h-3.5 text-amber-500" />
                                 <span>시총 대비 수급 집중주</span>
                             </div>
-                            <div className="flex flex-wrap gap-1.5 max-h-60 overflow-y-auto pr-1 thin-scrollbar">
+                            <div className="flex flex-wrap gap-2 max-h-60 overflow-y-auto pr-1 thin-scrollbar">
                                 {analysis.highTurnover.length > 0 ? analysis.highTurnover.map((item: {name: string, code: string, badge?: string}, idx: number) => (
                                     <span 
                                       key={`${item.code}-${idx}`} 
                                       title={item.badge || "시총 대비 수급 집중주"}
-                                      className="px-2 py-0.5 bg-amber-500/20 text-amber-300 text-[10px] font-bold rounded-full border border-amber-500/30 cursor-pointer hover:bg-amber-500/40 transition-all flex items-center gap-1 select-none"
+                                      className="px-2.5 py-1 bg-amber-500/20 text-amber-300 text-[10.5px] md:text-xs font-black rounded-full border border-amber-500/30 cursor-pointer hover:bg-amber-500/40 transition-all flex items-center gap-1 select-none"
                                       onClick={(e) => handleStockClick(e, item.code, item.name)}
                                     >
                                         {item.name}
-                                        {item.badge && <span className="text-[8px] opacity-85" aria-label="badge indicator">⚡</span>}
+                                        {item.badge && <span className="text-[9px] opacity-85" aria-label="badge indicator">⚡</span>}
                                     </span>
-                                )) : <span className="text-[10px] text-muted-foreground italic">데이터 분석 중</span>}
+                                )) : <span className="text-[10.5px] md:text-xs text-muted-foreground italic">데이터 분석 중</span>}
                             </div>
                         </div>
                     </div>
