@@ -61,7 +61,9 @@ const WEIGHT_PROFILES = {
 const STATE_STYLES = {
   AGGRESSIVE_LONG: { color: "text-red-500",       bg: "bg-red-500/10",   border: "border-red-500/30" },
   CAUTIOUS_LONG:   { color: "text-red-500",       bg: "bg-red-500/10",   border: "border-red-500/30" },
+  MODERATE_LONG:   { color: "text-rose-400",       bg: "bg-rose-400/10",   border: "border-rose-400/30" },
   HOLD:            { color: "text-amber-500",      bg: "bg-amber-500/10",  border: "border-amber-500/30" },
+  BEARISH_CAUTION: { color: "text-blue-400",      bg: "bg-blue-400/10",   border: "border-blue-400/30" },
   EXIT_PRIORITY:   { color: "text-blue-500",      bg: "bg-blue-500/10", border: "border-blue-500/30" },
 } as const;
 
@@ -481,7 +483,21 @@ export default function DashboardPage() {
                             }
                           </Badge>
 
-                          {/* 2. 거부권 제어 발동 시 독립 라벨 추가 */}
+                          {/* 2. 시장 상태 (히스테리시스 룰 기반) 라벨 */}
+                          {analysisResult.analysis.marketState && (
+                            <Badge 
+                              variant="outline"
+                              className={`border-current font-bold ${
+                                STATE_STYLES[
+                                  analysisResult.analysis.marketState as keyof typeof STATE_STYLES
+                                ]?.color || "text-muted-foreground"
+                              }`}
+                            >
+                              시장 상태 : {analysisResult.analysis.marketStateLabel}
+                            </Badge>
+                          )}
+
+                          {/* 3. 거부권 제어 발동 시 독립 라벨 추가 */}
                           {analysisResult.analysis.veto?.triggered && (
                             <Badge 
                               variant="outline"
