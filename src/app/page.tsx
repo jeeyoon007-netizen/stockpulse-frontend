@@ -582,56 +582,47 @@ export default function DashboardPage() {
                   })}
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <div className="bg-background/50 rounded-xl border border-border/50 overflow-hidden flex flex-col h-[350px] shadow-sm">
-                    <div className="bg-secondary/30 px-4 py-3 border-b border-border/50 flex items-center gap-2">
-                      <Gavel className="w-4 h-4 text-chart-4" />
-                      <span className="font-bold text-xs uppercase tracking-widest text-muted-foreground">Audit & Cross-Reference Log</span>
-                    </div>
-                    <ScrollArea className="flex-1 p-4">
-                      <div className="space-y-4">
-                         {analysisResult.analysis.auditLogs.map((log, idx) => (
-                           <div key={idx} className={`flex gap-3 items-start ${log.vetoTriggered ? 'bg-red-500/10 p-2.5 rounded-lg border border-red-500/20' : ''}`}>
-                              <div className="shrink-0 w-6 h-6 rounded-lg bg-primary/10 flex items-center justify-center text-[10px] font-black text-primary border border-primary/20 mt-1">
-                                {log.step}
-                              </div>
-                              <div className="flex-1">
-                                <span className="text-[10px] font-black block mb-1 text-primary italic">{log.expertName} → AUDIT</span>
-                                <p className="text-[11px] font-medium rounded-lg bg-secondary/50 p-3 leading-relaxed text-muted-foreground border border-border/50 shadow-sm">
-                                  {log.message}
-                                </p>
-                              </div>
-                           </div>
-                         ))}
-                      </div>
-                    </ScrollArea>
+                <div className="bg-background/50 rounded-xl border border-border/50 overflow-hidden flex flex-col shadow-sm">
+                  <div className="bg-secondary/30 px-4 py-3 border-b border-border/50 flex items-center gap-2">
+                    <Target className="w-4 h-4 text-chart-2" />
+                    <span className="font-bold text-xs uppercase tracking-widest text-muted-foreground">Strategic Operation Plan</span>
                   </div>
+                  <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Left Column: 진입 전략 및 손절가 (Entry Strategy & Stop Loss) */}
+                    <div className="space-y-4">
+                      <h4 className="text-xs md:text-sm font-bold text-white uppercase tracking-widest border-b border-border/50 pb-2 flex items-center gap-1.5">
+                        <Target className="w-3.5 h-3.5 text-emerald-400" />
+                        진입 전략 및 손절가 (Entry Strategy & Stop Loss)
+                      </h4>
+                      
+                      <div className="flex justify-between items-center bg-emerald-500/5 border border-emerald-500/30 p-4 rounded-xl relative overflow-hidden group">
+                        <div className="absolute left-0 top-0 w-1.5 h-full bg-emerald-500" />
+                        <span className="text-xs md:text-sm font-black text-emerald-400 uppercase tracking-widest">Golden Entry Zone</span>
+                        <span className="font-mono font-black text-xs md:text-sm text-white drop-shadow-sm">{analysisResult.analysis.strategy.entryRange}</span>
+                      </div>
 
-                  <div className="bg-background/50 rounded-xl border border-border/50 overflow-hidden flex flex-col h-[350px] shadow-sm">
-                    <div className="bg-secondary/30 px-4 py-3 border-b border-border/50 flex items-center gap-2">
-                      <Target className="w-4 h-4 text-chart-2" />
-                      <span className="font-bold text-xs uppercase tracking-widest text-muted-foreground">Strategic Operation Plan</span>
+                      <div className="flex justify-between items-center bg-stock-down/5 border border-stock-down/20 p-4 rounded-xl hover:bg-stock-down/10 transition-colors relative overflow-hidden">
+                        <div className="absolute left-0 top-0 w-1.5 h-full bg-stock-down" />
+                        <span className="text-xs md:text-sm font-black text-stock-down uppercase tracking-tighter">Critical Risk Guard (Stop Loss)</span>
+                        <span className="font-mono font-black text-xs md:text-sm text-white">₩{analysisResult.analysis.strategy.stopLoss.toLocaleString()}</span>
+                      </div>
                     </div>
-                    <div className="p-5 flex-1 flex flex-col justify-center space-y-3">
-                      <div className="flex justify-between items-center bg-stock-up/5 border border-stock-up/20 p-3.5 rounded-xl hover:bg-stock-up/10 transition-colors">
-                        <span className="text-[10px] text-stock-up font-black uppercase tracking-tighter">Profit Target (Level 2)</span>
-                        <span className="font-mono font-black text-lg">₩{analysisResult.analysis.strategy.targetSecondary.toLocaleString()}</span>
+
+                    {/* Right Column: 상승 목표값 (Upside Targets) */}
+                    <div className="space-y-4">
+                      <h4 className="text-xs md:text-sm font-bold text-white uppercase tracking-widest border-b border-border/50 pb-2 flex items-center gap-1.5">
+                        <TrendingUp className="w-3.5 h-3.5 text-stock-up" />
+                        상승 목표값 (Upside Targets)
+                      </h4>
+
+                      <div className="flex justify-between items-center bg-stock-up/5 border border-stock-up/10 p-4 rounded-xl">
+                        <span className="text-xs md:text-sm font-black text-stock-up/80 uppercase tracking-tighter">Initial Target (Level 1)</span>
+                        <span className="font-mono font-black text-xs md:text-sm text-white">₩{analysisResult.analysis.strategy.targetPrimary.toLocaleString()}</span>
                       </div>
-                      
-                      <div className="flex justify-between items-center bg-stock-up/5 border border-stock-up/10 p-3.5 rounded-xl">
-                        <span className="text-[10px] text-stock-up/80 font-black uppercase tracking-tighter">Initial Target (Level 1)</span>
-                        <span className="font-mono font-bold text-md">₩{analysisResult.analysis.strategy.targetPrimary.toLocaleString()}</span>
-                      </div>
-                      
-                      <div className="flex justify-between items-center bg-primary/5 border border-primary/30 p-4 rounded-xl relative overflow-hidden group">
-                        <div className="absolute left-0 top-0 w-1.5 h-full bg-primary" />
-                        <span className="text-[10px] text-primary font-black uppercase tracking-widest">Golden Entry Zone</span>
-                        <span className="font-mono font-black text-xl text-primary drop-shadow-sm">{analysisResult.analysis.strategy.entryRange}</span>
-                      </div>
-                      
-                      <div className="flex justify-between items-center bg-stock-down/5 border border-stock-down/20 p-3.5 rounded-xl hover:bg-stock-down/10 transition-colors">
-                        <span className="text-[10px] text-stock-down font-black uppercase tracking-tighter">Critical Risk Guard</span>
-                        <span className="font-mono font-black text-lg">₩{analysisResult.analysis.strategy.stopLoss.toLocaleString()}</span>
+
+                      <div className="flex justify-between items-center bg-stock-up/5 border border-stock-up/20 p-4 rounded-xl hover:bg-stock-up/10 transition-colors">
+                        <span className="text-xs md:text-sm font-black text-stock-up uppercase tracking-tighter">Profit Target (Level 2)</span>
+                        <span className="font-mono font-black text-xs md:text-sm text-white">₩{analysisResult.analysis.strategy.targetSecondary.toLocaleString()}</span>
                       </div>
                     </div>
                   </div>
