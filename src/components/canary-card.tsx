@@ -239,7 +239,7 @@ export function CanaryCard({ data, marketOverview, onAnalyze }: Props) {
                 )}
               </div>
               <div className="flex items-baseline gap-1">
-                <span className="text-lg md:text-xl font-black tracking-tighter font-mono text-foreground">
+                <span className="text-sm md:text-base font-black tracking-tighter font-mono text-foreground">
                     {funds ? formatMoney(Math.round(funds.deposit / 100000000)) : "---"}
                 </span>
                 <span className="text-[10px] font-black text-muted-foreground/90">원</span>
@@ -269,7 +269,7 @@ export function CanaryCard({ data, marketOverview, onAnalyze }: Props) {
                 )}
               </div>
               <div className="flex items-baseline gap-1 relative z-10 flex-wrap">
-                <span className="text-lg md:text-xl font-black tracking-tighter font-mono text-foreground">
+                <span className="text-sm md:text-base font-black tracking-tighter font-mono text-foreground">
                     {latestCredit ? (latestCredit.amount / 1000000000000).toFixed(1) : "---"}
                 </span>
                 <span className="text-[10px] font-black text-muted-foreground/90">조원</span>
@@ -304,7 +304,7 @@ export function CanaryCard({ data, marketOverview, onAnalyze }: Props) {
                 <span className="text-[9px] md:text-[10px] text-muted-foreground/80 font-mono font-bold">{adrKospi?.time || "---"}</span>
               </div>
               <div className="flex items-baseline gap-2">
-                <span className="text-base md:text-lg font-black tracking-tighter font-mono text-foreground">
+                <span className="text-sm md:text-base font-black tracking-tighter font-mono text-foreground">
                   {adrKospi ? Number(adrKospi.adr).toFixed(2) : "---"}%
                 </span>
                 <span className={`text-[10.5px] md:text-xs font-black ${getSignalColor(adrKospi?.signal || "")}`}>
@@ -320,7 +320,7 @@ export function CanaryCard({ data, marketOverview, onAnalyze }: Props) {
                 <span className="text-[9px] md:text-[10px] text-muted-foreground/80 font-mono font-bold">{adrKosdaq?.time || "---"}</span>
               </div>
               <div className="flex items-baseline gap-2">
-                <span className="text-base md:text-lg font-black tracking-tighter font-mono text-foreground">
+                <span className="text-sm md:text-base font-black tracking-tighter font-mono text-foreground">
                   {adrKosdaq ? Number(adrKosdaq.adr).toFixed(2) : "---"}%
                 </span>
                 <span className={`text-[10.5px] md:text-xs font-black ${getSignalColor(adrKosdaq?.signal || "")}`}>
