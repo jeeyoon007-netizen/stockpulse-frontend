@@ -59,10 +59,23 @@ const WEIGHT_PROFILES = {
 } as const;
 
 const STATE_STYLES = {
-  AGGRESSIVE_LONG: { color: "text-stock-up",       bg: "bg-stock-up/10",   border: "border-stock-up/30" },
-  CAUTIOUS_LONG:   { color: "text-amber-400",       bg: "bg-amber-500/10",  border: "border-amber-500/30" },
-  HOLD:            { color: "text-muted-foreground", bg: "bg-muted/20",      border: "border-border/30" },
-  EXIT_PRIORITY:   { color: "text-stock-down",      bg: "bg-stock-down/10", border: "border-stock-down/30" },
+  AGGRESSIVE_LONG: { color: "text-red-500",       bg: "bg-red-500/10",   border: "border-red-500/30" },
+  CAUTIOUS_LONG:   { color: "text-red-500",       bg: "bg-red-500/10",   border: "border-red-500/30" },
+  HOLD:            { color: "text-amber-500",      bg: "bg-amber-500/10",  border: "border-amber-500/30" },
+  EXIT_PRIORITY:   { color: "text-blue-500",      bg: "bg-blue-500/10", border: "border-blue-500/30" },
+} as const;
+
+const VERDICT_LABELS = {
+  AGGRESSIVE_LONG: "상승 (적극 진입)",
+  CAUTIOUS_LONG: "상승 (관망/주의)",
+  HOLD: "중립 (보류)",
+  EXIT_PRIORITY: "하락 (대피 우선)",
+} as const;
+
+const FINAL_VERDICT_STYLES = {
+  "상승": { color: "text-red-500", bg: "bg-red-500/10", border: "border-red-500/30" },
+  "하락": { color: "text-blue-500", bg: "bg-blue-500/10", border: "border-blue-500/30" },
+  "횡보/보합": { color: "text-amber-500", bg: "bg-amber-500/10", border: "border-amber-500/30" },
 } as const;
 
 function DirectionIcon({ direction }: { direction: "up" | "down" | "flat" }) {
@@ -190,6 +203,11 @@ export default function DashboardPage() {
     setAnalysisResult(null);
     setLoadingStep(0);
 
+    // 분석 시작 시 화면을 상단으로 올려 진행 상태와 결과를 모바일/데스크톱 모두에서 바로 보게 함
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
     const interval = setInterval(() => {
       setLoadingStep((prev) => (prev < 4 ? prev + 1 : prev));
     }, 1200);
@@ -228,18 +246,19 @@ export default function DashboardPage() {
 
       {/* Market Overview (Real-time Indexes) */}
       <section id="market-overview" className="animate-in fade-in slide-in-from-top-4 duration-700">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 md:gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4">
           {marketOverview.length > 0 ? marketOverview.map((item) => (
             <Card
               key={item.label}
               className="card-glow border-border/50 hover:border-primary/30 transition-all duration-300 bg-background/30 shadow-sm"
             >
-              <CardContent className="p-3 md:p-4">
+              {/* 모바일에서 세로 박스 여유 공간(padding)을 줄이기 위해 p-2 md:p-4 적용 (글자 크기는 그대로 유지) */}
+              <CardContent className="p-2 md:p-4">
                 <div className="flex flex-col">
                   <span className="text-[9px] md:text-[10px] font-bold text-muted-foreground mb-0.5 uppercase tracking-widest">{item.label}</span>
-                  <div className="flex items-center justify-between gap-1">
+                  <div className="flex items-center justify-between gap-0.5 md:gap-1">
                     <span className="text-sm md:text-xl font-black tracking-tighter font-mono truncate">{item.value}</span>
-                    <div className={`flex items-center gap-1 text-[10px] font-black ${directionColor(item.direction)}`}>
+                    <div className={`flex items-center gap-0.5 md:gap-1 text-[10px] font-black ${directionColor(item.direction)}`}>
                         <DirectionIcon direction={item.direction} />
                         {item.changePercent}
                     </div>
@@ -248,9 +267,9 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
           )) : (
-            // Loading skeleton
+            // Loading skeleton - 모바일에서는 높이 h-14, 데스크톱에서는 md:h-20으로 최적화
             [...Array(4)].map((_, i) => (
-                <div key={i} className="h-20 bg-muted/20 animate-pulse rounded-xl border border-border/50"></div>
+                <div key={i} className="h-14 md:h-20 bg-muted/20 animate-pulse rounded-xl border border-border/50"></div>
             ))
           )}
         </div>
@@ -425,16 +444,69 @@ export default function DashboardPage() {
                       <h3 className="text-xl md:text-3xl font-black">{analysisResult.stockData.name} <span className="text-sm md:text-lg text-muted-foreground font-mono font-normal tracking-wider ml-1">({analysisResult.stockData.code})</span></h3>
                       <WatchlistButton stockCode={analysisResult.stockData.code} stockName={analysisResult.stockData.name} />
                     </div>
-                    <div className="flex items-center gap-3 mt-1.5">
+                    <div className="flex flex-wrap items-center gap-2 md:gap-3 mt-1.5">
                       <span className="text-lg md:text-2xl font-black font-mono tracking-tighter">
                          ₩{analysisResult.stockData.currentPrice.toLocaleString()}
                       </span>
                       <Badge variant="outline" className={`border-current font-bold ${directionColor(analysisResult.stockData.change > 0 ? "up" : "down")}`}>
                         {analysisResult.stockData.change > 0 ? "▲" : "▼"}{Math.abs(analysisResult.stockData.changePercent)}%
                       </Badge>
+                      
+                      {/* 종합 결과 방향성 배지 추가 */}
+                      {analysisResult.analysis?.finalVerdict && (
+                        <>
+                          {/* 1. 전문가 순수 합의 라벨 */}
+                          <Badge 
+                            variant="outline"
+                            className={`border-current font-bold ${
+                              FINAL_VERDICT_STYLES[
+                                (analysisResult.analysis.veto?.triggered
+                                  ? (analysisResult.analysis.weightedScore > 0.2
+                                      ? "상승"
+                                      : analysisResult.analysis.weightedScore < -0.2
+                                      ? "하락"
+                                      : "횡보/보합")
+                                  : analysisResult.analysis.finalVerdict) as keyof typeof FINAL_VERDICT_STYLES
+                              ]?.color || "text-muted-foreground"
+                            }`}
+                          >
+                            전문가 합의 : {
+                              analysisResult.analysis.veto?.triggered
+                                ? (analysisResult.analysis.weightedScore > 0.2
+                                    ? "상승"
+                                    : analysisResult.analysis.weightedScore < -0.2
+                                    ? "하락"
+                                    : "횡보/보합")
+                                : analysisResult.analysis.finalVerdict
+                            }
+                          </Badge>
+
+                          {/* 2. 거부권 제어 발동 시 독립 라벨 추가 */}
+                          {analysisResult.analysis.veto?.triggered && (
+                            <Badge 
+                              variant="outline"
+                              className={`border-current font-bold ${
+                                analysisResult.analysis.veto.priority === 'P1'
+                                  ? "text-red-500"
+                                  : "text-amber-500"
+                              }`}
+                            >
+                              🚨 거부권 발동
+                            </Badge>
+                          )}
+                        </>
+                      )}
+
                     </div>
                   </div>
                 </div>
+
+                {/* 차트 영역을 분석 종목 주가 정보 밑(3인 전문가 및 기타 상세 의견 위)에 위치시킴 */}
+                {analysisResult.stockData.ohlcv && (
+                  <div className="bg-background/40 rounded-xl overflow-hidden border border-border/50 p-2 shadow-inner mt-2 animate-in fade-in duration-500 w-full">
+                    <TradingViewChart data={analysisResult.stockData.ohlcv} trades={backtestTrades} />
+                  </div>
+                )}
 
                 {analysisResult.analysis.veto?.triggered && (
                   <div className="flex items-center gap-3.5 p-4 bg-red-500/10 border border-red-500/30 rounded-lg text-xs font-bold text-red-400 animate-in fade-in">
@@ -549,11 +621,7 @@ export default function DashboardPage() {
                   </div>
                 </div>
 
-                {analysisResult.stockData.ohlcv && (
-                  <div className="bg-background/40 rounded-xl overflow-hidden border border-border/50 p-2 shadow-inner mt-6 animate-in fade-in duration-500">
-                    <TradingViewChart data={analysisResult.stockData.ohlcv} trades={backtestTrades} />
-                  </div>
-                )}
+                {/* 차트는 주가 정보 하단으로 이동됨 */}
               </div>
             )}
           </CardContent>
