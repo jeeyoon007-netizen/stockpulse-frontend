@@ -38,7 +38,7 @@ import {
  */
 const CACHE_TTL = 70 * 1000;
 const GLOBAL_CACHE: Record<string, { data: any, timestamp: number }> = {};
-const BACKEND_URL = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080";
+const BACKEND_URL = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_BACKEND_URL || "https://stock-brv7.onrender.com";
 
 function getCachedData(key: string) {
     const cached = GLOBAL_CACHE[key];
