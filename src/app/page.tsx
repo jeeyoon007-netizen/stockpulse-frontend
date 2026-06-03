@@ -129,6 +129,19 @@ export default function DashboardPage() {
           }
           // handleAnalyze 호출
           handleAnalyze(codeFromUrl);
+        } else {
+          // 로컬스토리지에서 최근 분석 종목 로드
+          const lastCode = localStorage.getItem("stockpulse_last_analyzed_code");
+          if (lastCode && lastCode.length >= 6) {
+            setStockCode(lastCode);
+            const match = data.find((s: any) => s.code === lastCode);
+            if (match) {
+              setSearchInput(match.name);
+            } else {
+              setSearchInput(lastCode);
+            }
+            handleAnalyze(lastCode);
+          }
         }
       })
       .catch(err => console.error("stocks.json 로드 실패:", err));
@@ -216,6 +229,9 @@ export default function DashboardPage() {
       const stockMatch = stocks.find(s => s.code === finalCode);
       const result = await analyzeStockAction(finalCode, activeMode, stockMatch?.name);
       setAnalysisResult(result);
+      if (result.success && result.stockData?.code) {
+        localStorage.setItem("stockpulse_last_analyzed_code", result.stockData.code);
+      }
     } catch (error) {
       console.error(error);
       setAnalysisResult({ success: false, error: "서버 액션 호출 실패" });

@@ -355,3 +355,58 @@ export async function fetchInvestorFlowAction(type: '1' | '2', market = '0001'):
   }
 }
 
+/**
+ * 관심종목 추가 서버 액션
+ */
+export async function addToWatchlistAction(nickname: string, stockCode: string, stockName: string) {
+  try {
+    const res = await fetch(`${BACKEND_URL}/api/v1/watchlist/add`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nickname, stock_code: stockCode, stock_name: stockName }),
+      cache: "no-store"
+    });
+    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+    return await res.json();
+  } catch (e: any) {
+    console.error("addToWatchlistAction error:", e);
+    return { success: false, error: e.message || "Failed to add to watchlist" };
+  }
+}
+
+/**
+ * 관심종목 삭제 서버 액션
+ */
+export async function removeFromWatchlistAction(nickname: string, stockCode: string) {
+  try {
+    const res = await fetch(`${BACKEND_URL}/api/v1/watchlist/remove`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nickname, stock_code: stockCode }),
+      cache: "no-store"
+    });
+    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+    return await res.json();
+  } catch (e: any) {
+    console.error("removeFromWatchlistAction error:", e);
+    return { success: false, error: e.message || "Failed to remove from watchlist" };
+  }
+}
+
+/**
+ * 관심종목 목록 조회 서버 액션
+ */
+export async function fetchWatchlistAction(nickname: string) {
+  try {
+    const res = await fetch(`${BACKEND_URL}/api/v1/watchlist/list?nickname=${encodeURIComponent(nickname)}`, {
+      cache: "no-store"
+    });
+    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+    return await res.json();
+  } catch (e: any) {
+    console.error("fetchWatchlistAction error:", e);
+    return { success: false, error: e.message || "Failed to fetch watchlist" };
+  }
+}
+
+

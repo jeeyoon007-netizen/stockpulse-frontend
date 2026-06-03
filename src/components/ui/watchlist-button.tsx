@@ -1,19 +1,20 @@
 "use client";
-
+ 
 import { useState, useEffect } from "react";
 import { Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
-
+import { addToWatchlistAction, removeFromWatchlistAction, fetchWatchlistAction } from "@/app/actions";
+ 
 interface WatchlistButtonProps {
   stockCode: string;
   stockName: string;
 }
-
+ 
 export function WatchlistButton({ stockCode, stockName }: WatchlistButtonProps) {
   const [isWatched, setIsWatched] = useState(false);
   const [nickname, setNickname] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-
+ 
   useEffect(() => {
     // Check if nickname exists in localStorage
     const storedNickname = localStorage.getItem("stockpulse_nickname");
@@ -22,11 +23,10 @@ export function WatchlistButton({ stockCode, stockName }: WatchlistButtonProps) 
       checkIsWatched(storedNickname);
     }
   }, [stockCode]);
-
+ 
   const checkIsWatched = async (nick: string) => {
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080"}/api/v1/watchlist/list?nickname=${encodeURIComponent(nick)}`);
-      const json = await res.json();
+      const json = await fetchWatchlistAction(nick);
       if (json.success && json.data) {
         const found = json.data.some((item: any) => item.stock_code === stockCode);
         setIsWatched(found);
@@ -35,7 +35,7 @@ export function WatchlistButton({ stockCode, stockName }: WatchlistButtonProps) 
       console.error("Failed to check watchlist status", e);
     }
   };
-
+ 
   const handleToggle = async () => {
     let currentNick = nickname;
     if (!currentNick) {
@@ -49,21 +49,17 @@ export function WatchlistButton({ stockCode, stockName }: WatchlistButtonProps) 
       setNickname(sanitized);
       currentNick = sanitized;
     }
-
+ 
     setIsLoading(true);
-    const endpoint = isWatched ? '/api/v1/watchlist/remove' : '/api/v1/watchlist/add';
     
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080"}${endpoint}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          nickname: currentNick,
-          stock_code: stockCode,
-          stock_name: stockName
-        })
-      });
-      const json = await res.json();
+      let json;
+      if (isWatched) {
+        json = await removeFromWatchlistAction(currentNick, stockCode);
+      } else {
+        json = await addToWatchlistAction(currentNick, stockCode, stockName);
+      }
+      
       if (json.success) {
         setIsWatched(!isWatched);
       } else {
@@ -75,7 +71,7 @@ export function WatchlistButton({ stockCode, stockName }: WatchlistButtonProps) 
       setIsLoading(false);
     }
   };
-
+ 
   return (
     <Button
       variant="outline"
@@ -89,3 +85,4 @@ export function WatchlistButton({ stockCode, stockName }: WatchlistButtonProps) 
     </Button>
   );
 }
+

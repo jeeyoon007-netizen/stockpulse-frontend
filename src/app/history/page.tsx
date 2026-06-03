@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { BacktestBadge } from "@/components/ui/backtest-badge";
+import { fetchWatchlistAction, removeFromWatchlistAction } from "@/app/actions";
 
 interface WatchlistItem {
   stock_code: string;
@@ -61,8 +62,7 @@ export default function HistoryPage() {
   const fetchWatchlist = async (nick: string) => {
     setIsLoading(true);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080"}/api/v1/watchlist/list?nickname=${encodeURIComponent(nick)}`);
-      const json = await res.json();
+      const json = await fetchWatchlistAction(nick);
       if (json.success) {
         setWatchlist(json.data);
       }
@@ -89,19 +89,17 @@ export default function HistoryPage() {
   const removeItem = async (stockCode: string) => {
     if (!nickname) return;
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080"}/api/v1/watchlist/remove`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nickname, stock_code: stockCode })
-      });
-      const json = await res.json();
+      const json = await removeFromWatchlistAction(nickname, stockCode);
       if (json.success) {
         setWatchlist((prev) => prev.filter((item) => item.stock_code !== stockCode));
+      } else {
+        alert("삭제 중 오류가 발생했습니다: " + json.error);
       }
     } catch (e) {
       alert("삭제 중 오류가 발생했습니다.");
     }
   };
+
 
   return (
     <div className="p-6 lg:p-8 space-y-6 max-w-[1200px] mx-auto">
