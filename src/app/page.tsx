@@ -127,20 +127,16 @@ export default function DashboardPage() {
           } else {
             setSearchInput(codeFromUrl);
           }
-          // handleAnalyze 호출
-          handleAnalyze(codeFromUrl);
+          handleAnalyze(codeFromUrl, undefined, data);
         } else {
           // 로컬스토리지에서 최근 분석 종목 로드
           const lastCode = localStorage.getItem("stockpulse_last_analyzed_code");
+          const lastName = localStorage.getItem("stockpulse_last_analyzed_name");
           if (lastCode && lastCode.length >= 6) {
             setStockCode(lastCode);
             const match = data.find((s: any) => s.code === lastCode);
-            if (match) {
-              setSearchInput(match.name);
-            } else {
-              setSearchInput(lastCode);
-            }
-            handleAnalyze(lastCode);
+            setSearchInput(match?.name || lastName || lastCode);
+            handleAnalyze(lastCode, undefined, data);
           }
         }
       })
@@ -164,7 +160,8 @@ export default function DashboardPage() {
   // 분석 결과 완료 시 백테스트 타점 정보 자동 조회
   useEffect(() => {
     if (analysisResult?.success && analysisResult.stockData?.code) {
-      fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080"}/api/v1/analysis/backtest?code=${analysisResult.stockData.code}`)
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "https://stock-brv7.onrender.com";
+      fetch(`${backendUrl}/api/v1/analysis/backtest?code=${analysisResult.stockData.code}`)
         .then(res => res.json())
         .then(json => {
           if (json.success && json.data && json.data.trades) {
@@ -194,14 +191,17 @@ export default function DashboardPage() {
     "Supabase DB 저장 중..."
   ];
 
-  const handleAnalyze = async (codeToAnalyze?: string, modeToAnalyze?: AnalysisMode) => {
+  const handleAnalyze = async (codeToAnalyze?: string, modeToAnalyze?: AnalysisMode, stocksOverride?: {code: string, name: string, market: string}[]) => {
     const target = codeToAnalyze || stockCode || searchInput;
     const activeMode = modeToAnalyze || mode;
     if (!target || target.length < 6) return;
     
+    // stocksOverride가 있으면 사용 (useEffect 내부에서 호출 시 React state 반영 전이므로 직접 전달)
+    const activeStocks = stocksOverride || stocks;
+    
     let finalCode = target;
     if (!/^\d+$/.test(target)) {
-      const match = stocks.find(s => s.name === target);
+      const match = activeStocks.find(s => s.name === target);
       if (match) {
         finalCode = match.code;
         setStockCode(finalCode);
@@ -226,11 +226,12 @@ export default function DashboardPage() {
 
     try {
       // 프론트엔드 마스터 데이터에서 종목명을 찾아 백엔드에 전달 (백엔드 stocks.json 의존 제거)
-      const stockMatch = stocks.find(s => s.code === finalCode);
+      const stockMatch = activeStocks.find(s => s.code === finalCode);
       const result = await analyzeStockAction(finalCode, activeMode, stockMatch?.name);
       setAnalysisResult(result);
       if (result.success && result.stockData?.code) {
         localStorage.setItem("stockpulse_last_analyzed_code", result.stockData.code);
+        localStorage.setItem("stockpulse_last_analyzed_name", result.stockData.name || stockMatch?.name || finalCode);
       }
     } catch (error) {
       console.error(error);
