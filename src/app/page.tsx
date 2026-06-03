@@ -14,7 +14,8 @@ import {
   BrainCircuit,
   Gavel,
   Target,
-  AlertCircle
+  AlertCircle,
+  RefreshCw
 } from "lucide-react";
 import {
   Card,
@@ -191,7 +192,12 @@ export default function DashboardPage() {
     "Supabase DB 저장 중..."
   ];
 
-  const handleAnalyze = async (codeToAnalyze?: string, modeToAnalyze?: AnalysisMode, stocksOverride?: {code: string, name: string, market: string}[]) => {
+  const handleAnalyze = async (
+    codeToAnalyze?: string, 
+    modeToAnalyze?: AnalysisMode, 
+    stocksOverride?: {code: string, name: string, market: string}[],
+    forceRefresh = false
+  ) => {
     const target = codeToAnalyze || stockCode || searchInput;
     const activeMode = modeToAnalyze || mode;
     if (!target || target.length < 6) return;
@@ -208,6 +214,26 @@ export default function DashboardPage() {
       } else {
         setAnalysisResult({ success: false, error: "유효한 종목코드 또는 이름이 아닙니다." });
         return;
+      }
+    }
+
+    // 1. 세션 스토리지 캐시 확인 (강제 새로고침이 아닐 때)
+    const cacheKey = `stockpulse_analysis_cache_${finalCode}_${activeMode}`;
+    if (!forceRefresh) {
+      const cached = sessionStorage.getItem(cacheKey);
+      if (cached) {
+        try {
+          const { timestamp, data } = JSON.parse(cached);
+          const CACHE_EXPIRY_MS = 5 * 60 * 1000; // 5분
+          if (Date.now() - timestamp < CACHE_EXPIRY_MS) {
+            console.log(`[CACHE HIT] Loaded analysis for ${finalCode} (${activeMode}) from sessionStorage.`);
+            setAnalysisResult(data);
+            setIsAnalyzing(false);
+            return;
+          }
+        } catch (e) {
+          console.error("캐시 파싱 에러:", e);
+        }
       }
     }
 
@@ -232,6 +258,12 @@ export default function DashboardPage() {
       if (result.success && result.stockData?.code) {
         localStorage.setItem("stockpulse_last_analyzed_code", result.stockData.code);
         localStorage.setItem("stockpulse_last_analyzed_name", result.stockData.name || stockMatch?.name || finalCode);
+        
+        // 캐시 저장
+        sessionStorage.setItem(cacheKey, JSON.stringify({
+          timestamp: Date.now(),
+          data: result
+        }));
       }
     } catch (error) {
       console.error(error);
@@ -458,9 +490,21 @@ export default function DashboardPage() {
 
                 <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
                   <div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 flex-wrap">
                       <h3 className="text-xl md:text-3xl font-black">{analysisResult.stockData.name} <span className="text-sm md:text-lg text-muted-foreground font-mono font-normal tracking-wider ml-1">({analysisResult.stockData.code})</span></h3>
-                      <WatchlistButton stockCode={analysisResult.stockData.code} stockName={analysisResult.stockData.name} />
+                      <div className="flex items-center gap-2">
+                        <WatchlistButton stockCode={analysisResult.stockData.code} stockName={analysisResult.stockData.name} />
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-1.5 text-muted-foreground hover:text-foreground"
+                          onClick={() => handleAnalyze(analysisResult.stockData.code, mode, undefined, true)}
+                          disabled={isAnalyzing}
+                        >
+                          <RefreshCw className={`w-3.5 h-3.5 ${isAnalyzing ? "animate-spin" : ""}`} />
+                          실시간 재분석
+                        </Button>
+                      </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-2 md:gap-3 mt-1.5">
                       <span className="text-lg md:text-2xl font-black font-mono tracking-tighter">
