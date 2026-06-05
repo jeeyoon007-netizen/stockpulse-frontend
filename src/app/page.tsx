@@ -593,9 +593,7 @@ export default function DashboardPage() {
                           ? '경보 - 탈출 우선' 
                           : '홀딩 - 진입 보류(관망)'}
                         <span className="ml-2 font-normal text-[11px] text-red-400/70 block sm:inline-block mt-0.5 sm:mt-0">
-                          {analysisResult.analysis.veto.priority === 'P1'
-                            ? '(단, 극단적 모멘텀이나 광풍 장세에서는 과열 지표를 무시하고 추가 폭등이 나타날 수 있습니다.)'
-                            : '(단, 박스권 횡보 수렴 이후 거래량이 급증하면 상방 또는 하방으로 강력한 방향성 돌파가 일어날 수 있습니다.)'}
+                          (일반적인 경우에 따른 거부권입니다. 시장상황에 따라 달라질 수 있음을 유의하세요.)
                         </span>
                       </div>
                       <div className="font-normal text-red-300/80 mt-1">{analysisResult.analysis.veto.reason}</div>

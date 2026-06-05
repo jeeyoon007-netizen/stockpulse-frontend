@@ -15,7 +15,7 @@ export function BacktestBadge({ stockCode }: BacktestBadgeProps) {
   useEffect(() => {
     async function fetchBacktest() {
       try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080"}/api/v1/analysis/backtest?code=${stockCode}`);
+        const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "https://stock-brv7.onrender.com"}/api/v1/analysis/backtest?code=${stockCode}`);
         const json = await res.json();
         if (json.success && json.data) {
           setData(json.data);
