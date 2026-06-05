@@ -121,6 +121,19 @@ export default function HistoryPage() {
         )}
       </header>
 
+      {/* Simulation Rules Explanation Box */}
+      <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 mb-2 text-sm text-muted-foreground animate-in fade-in duration-500">
+        <h3 className="font-bold text-foreground mb-2 flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 text-primary" />
+          AI 백테스팅 시뮬레이션 매매 규칙 (600일 기준)
+        </h3>
+        <ul className="list-disc list-inside space-y-1.5 ml-1 text-xs sm:text-sm">
+          <li><strong className="text-stock-up">진입(매수)</strong> : 강세 추세 판정 시 즉시 진입 / 완만한 상승 시 2일 연속 발생 시 진입</li>
+          <li><strong className="text-stock-down">청산(매도)</strong> : 탈출 우선 판정 시 즉시 청산 / 하락 주의 2일 연속 발생 시 청산</li>
+          <li><strong className="text-amber-500">리스크 관리</strong> : 진입 시점의 손절가 이탈 또는 목표가 도달 시 즉시 청산</li>
+        </ul>
+      </div>
+
       {/* Search Filter */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
