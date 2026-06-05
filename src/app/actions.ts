@@ -409,4 +409,64 @@ export async function fetchWatchlistAction(nickname: string) {
   }
 }
 
+/**
+ * 백테스트 타점 정보 조회 서버 액션
+ * Render 서버 타임아웃/응답 절단 버그 방어를 위해 DB 직접 조회 폴백 포함
+ */
+export async function fetchBacktestSummaryAction(code: string) {
+  // 1. 백엔드 브릿지 통신 시도 (최대 3초 대기)
+  try {
+    const res = await fetch(`${BACKEND_URL}/api/v1/analysis/backtest?code=${code}`, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(3000)
+    });
+    
+    if (res.ok) {
+      const text = await res.text();
+      try {
+        const json = JSON.parse(text);
+        if (json.success) return json;
+      } catch (parseError) {
+        console.warn("[ACTION] 백엔드 JSON 파싱 실패(응답 절단 의심), DB 직접 조회로 폴백합니다.");
+      }
+    }
+  } catch (err: any) {
+    console.warn(`[ACTION] 백엔드 백테스트 API 호출 에러(${err.message}), DB 직접 조회로 폴백합니다.`);
+  }
+
+  // 2. 백엔드 통신 실패 시 Supabase DB 직접 조회 (강력한 Fallback)
+  try {
+    if (!supabase) throw new Error("Supabase 클라이언트가 초기화되지 않았습니다.");
+    const { data: results, error: resError } = await supabase
+      .from('backtest_results')
+      .select('*')
+      .eq('stock_code', code)
+      .single();
+
+    if (resError && resError.code !== 'PGRST116') throw resError;
+    
+    if (!results) {
+      return { success: true, data: null }; // 데이터가 아예 없음
+    }
+
+    const { data: trades, error: tradesError } = await supabase
+      .from('backtest_trades')
+      .select('*')
+      .eq('stock_code', code);
+      
+    if (tradesError) throw tradesError;
+
+    return {
+      success: true,
+      data: {
+        ...results,
+        trades: trades || []
+      }
+    };
+  } catch (err: any) {
+    console.error("[ACTION] DB 직접 조회 백테스트 에러:", err.message);
+    return { success: false, error: err.message };
+  }
+}
+
 

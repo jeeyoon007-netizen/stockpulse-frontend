@@ -36,6 +36,7 @@ import {
   fetchFearGreedAction, 
   fetchCanaryDataAction,
   fetchMarketOverviewAction,
+  fetchBacktestSummaryAction,
   type AnalysisMode
 } from "./actions";
 import { TradingViewChart } from "@/components/tradingview-chart";
@@ -162,9 +163,7 @@ export default function DashboardPage() {
   // 분석 결과 완료 시 백테스트 타점 정보 자동 조회
   useEffect(() => {
     if (analysisResult?.success && analysisResult.stockData?.code) {
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "https://stock-brv7.onrender.com";
-      fetch(`${backendUrl}/api/v1/analysis/backtest?code=${analysisResult.stockData.code}`)
-        .then(res => res.json())
+      fetchBacktestSummaryAction(analysisResult.stockData.code)
         .then(json => {
           if (json.success && json.data) {
             setBacktestTrades(json.data.trades || []);
