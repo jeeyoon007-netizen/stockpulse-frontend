@@ -107,6 +107,7 @@ export default function DashboardPage() {
   });
 
   const [backtestTrades, setBacktestTrades] = useState<any[]>([]);
+  const [backtestSummary, setBacktestSummary] = useState<any>(null);
 
   useEffect(() => {
     setTimeStr(new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" }));
@@ -165,18 +166,22 @@ export default function DashboardPage() {
       fetch(`${backendUrl}/api/v1/analysis/backtest?code=${analysisResult.stockData.code}`)
         .then(res => res.json())
         .then(json => {
-          if (json.success && json.data && json.data.trades) {
-            setBacktestTrades(json.data.trades);
+          if (json.success && json.data) {
+            setBacktestTrades(json.data.trades || []);
+            setBacktestSummary(json.data);
           } else {
             setBacktestTrades([]);
+            setBacktestSummary(null);
           }
         })
         .catch(err => {
           console.error("Failed to fetch backtest trades", err);
           setBacktestTrades([]);
+          setBacktestSummary(null);
         });
     } else {
       setBacktestTrades([]);
+      setBacktestSummary(null);
     }
   }, [analysisResult]);
 
@@ -576,6 +581,34 @@ export default function DashboardPage() {
                     </div>
                   </div>
                 </div>
+
+                {/* 백테스트 요약 결과 뱃지 UI */}
+                {backtestSummary && (
+                  <div className="flex flex-wrap items-center gap-2 md:gap-3 p-3.5 bg-background/50 border border-primary/20 rounded-xl shadow-sm animate-in fade-in duration-300 w-full mt-2">
+                    <div className="flex items-center gap-1.5 shrink-0 bg-primary/10 text-primary px-2.5 py-1 rounded-md">
+                      <Target className="w-4 h-4" />
+                      <span className="font-bold text-sm">AI 최적전략: {backtestSummary.best_strategy_name}</span>
+                    </div>
+                    <Separator orientation="vertical" className="h-4 hidden sm:block bg-border/50" />
+                    <div className="flex items-center gap-3 text-sm">
+                      <div className="flex items-center gap-1.5">
+                        <Activity className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-muted-foreground text-xs font-medium">과거 1년 승률</span>
+                        <span className="font-black font-mono text-base">{backtestSummary.win_rate}%</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        {backtestSummary.total_return > 0 ? <TrendingUp className="w-4 h-4 text-stock-up" /> : <TrendingDown className="w-4 h-4 text-stock-down" />}
+                        <span className="text-muted-foreground text-xs font-medium">복리누적</span>
+                        <span className={`font-black font-mono text-base ${backtestSummary.total_return > 0 ? 'text-stock-up' : 'text-stock-down'}`}>
+                          {backtestSummary.total_return}%
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1 ml-1 md:ml-3">
+                        <span className="text-[10px] text-muted-foreground/80 bg-muted/50 px-2 py-0.5 rounded border border-border/50 font-mono">최대낙폭(MDD): {backtestSummary.mdd}%</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* 차트 영역을 분석 종목 주가 정보 밑(3인 전문가 및 기타 상세 의견 위)에 위치시킴 */}
                 {analysisResult.stockData.ohlcv && (
