@@ -36,7 +36,7 @@ export function BacktestBadge({ stockCode }: BacktestBadgeProps) {
 
   return (
     <div className="flex flex-col gap-1">
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <Badge variant="outline" className={`flex items-center gap-1.5 px-2.5 py-1 ${isProfitable ? 'border-stock-up/30 bg-stock-up/10 text-stock-up' : 'border-stock-down/30 bg-stock-down/10 text-stock-down'}`}>
           <Target className="w-3.5 h-3.5" />
           <span>AI 추천: {data.best_strategy_name}</span>
