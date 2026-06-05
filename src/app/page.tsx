@@ -593,28 +593,6 @@ export default function DashboardPage() {
                   </div>
                 </div>
 
-                {/* 디버그 정보 및 에러 표시 */}
-                {backtestError && (
-                  <div className="p-3 bg-red-950/20 border border-red-500/30 rounded-xl text-xs text-red-400 w-full mt-2 font-mono">
-                    <div>⚠️ 백테스트 조회 오류: {backtestError}</div>
-                    {debugInfo && (
-                      <div className="mt-1 text-[10px] text-red-400/80">
-                        [디버그] URL: {debugInfo.BACKEND_URL} | DB연결: {String(debugInfo.supabaseInitialized)} | EnvKeys: {debugInfo.envKeys.join(", ")}
-                      </div>
-                    )}
-                  </div>
-                )}
-                {!backtestSummary && !backtestError && (
-                  <div className="p-3 bg-blue-950/20 border border-blue-500/30 rounded-xl text-xs text-blue-400 w-full mt-2 font-mono">
-                    <div>ℹ️ 백테스트 상태: 로딩 대기 중이거나 데이터가 없습니다.</div>
-                    {debugInfo && (
-                      <div className="mt-1 text-[10px] text-blue-400/80">
-                        [디버그] URL: {debugInfo.BACKEND_URL} | DB연결: {String(debugInfo.supabaseInitialized)} | EnvKeys: {debugInfo.envKeys.join(", ")}
-                      </div>
-                    )}
-                  </div>
-                )}
-
                 {/* 백테스트 요약 결과 뱃지 UI */}
                 {backtestSummary && (
                   <div className="flex flex-wrap items-center gap-2 md:gap-3 p-3.5 bg-background/50 border border-primary/20 rounded-xl shadow-sm animate-in fade-in duration-300 w-full mt-2">

@@ -132,7 +132,7 @@ export function TradingViewChart({ data, trades }: TradingViewChartProps) {
       resizeObserver.disconnect();
       chart.remove();
     };
-  }, [data, isMobile]);
+  }, [data, isMobile, trades]);
 
   return <div ref={chartContainerRef} className="w-full h-[240px] md:h-[360px]" />;
 }
