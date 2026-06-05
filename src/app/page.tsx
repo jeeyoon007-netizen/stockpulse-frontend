@@ -37,6 +37,7 @@ import {
   fetchCanaryDataAction,
   fetchMarketOverviewAction,
   fetchBacktestSummaryAction,
+  getDebugInfoAction,
   type AnalysisMode
 } from "./actions";
 import { TradingViewChart } from "@/components/tradingview-chart";
@@ -109,9 +110,12 @@ export default function DashboardPage() {
 
   const [backtestTrades, setBacktestTrades] = useState<any[]>([]);
   const [backtestSummary, setBacktestSummary] = useState<any>(null);
+  const [backtestError, setBacktestError] = useState<string | null>(null);
+  const [debugInfo, setDebugInfo] = useState<any>(null);
 
   useEffect(() => {
     setTimeStr(new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" }));
+    getDebugInfoAction().then(setDebugInfo).catch(err => console.error("Debug info error:", err));
     
     // 종목 마스터 JSON 로드
     fetch("/stocks.json")
@@ -163,6 +167,7 @@ export default function DashboardPage() {
   // 분석 결과 완료 시 백테스트 타점 정보 자동 조회
   useEffect(() => {
     if (analysisResult?.success && analysisResult.stockData?.code) {
+      setBacktestError(null);
       fetchBacktestSummaryAction(analysisResult.stockData.code)
         .then(json => {
           if (json.success && json.data) {
@@ -171,16 +176,23 @@ export default function DashboardPage() {
           } else {
             setBacktestTrades([]);
             setBacktestSummary(null);
+            if (!json.success) {
+              setBacktestError(json.error || "데이터는 성공했으나 data가 null입니다.");
+            } else {
+              setBacktestError("데이터 없음 (Null)");
+            }
           }
         })
         .catch(err => {
           console.error("Failed to fetch backtest trades", err);
           setBacktestTrades([]);
           setBacktestSummary(null);
+          setBacktestError(err.message || "네트워크/서버 액션 에러");
         });
     } else {
       setBacktestTrades([]);
       setBacktestSummary(null);
+      setBacktestError(null);
     }
   }, [analysisResult]);
 
@@ -580,6 +592,28 @@ export default function DashboardPage() {
                     </div>
                   </div>
                 </div>
+
+                {/* 디버그 정보 및 에러 표시 */}
+                {backtestError && (
+                  <div className="p-3 bg-red-950/20 border border-red-500/30 rounded-xl text-xs text-red-400 w-full mt-2 font-mono">
+                    <div>⚠️ 백테스트 조회 오류: {backtestError}</div>
+                    {debugInfo && (
+                      <div className="mt-1 text-[10px] text-red-400/80">
+                        [디버그] URL: {debugInfo.BACKEND_URL} | DB연결: {String(debugInfo.supabaseInitialized)} | EnvKeys: {debugInfo.envKeys.join(", ")}
+                      </div>
+                    )}
+                  </div>
+                )}
+                {!backtestSummary && !backtestError && (
+                  <div className="p-3 bg-blue-950/20 border border-blue-500/30 rounded-xl text-xs text-blue-400 w-full mt-2 font-mono">
+                    <div>ℹ️ 백테스트 상태: 로딩 대기 중이거나 데이터가 없습니다.</div>
+                    {debugInfo && (
+                      <div className="mt-1 text-[10px] text-blue-400/80">
+                        [디버그] URL: {debugInfo.BACKEND_URL} | DB연결: {String(debugInfo.supabaseInitialized)} | EnvKeys: {debugInfo.envKeys.join(", ")}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* 백테스트 요약 결과 뱃지 UI */}
                 {backtestSummary && (

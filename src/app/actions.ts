@@ -469,4 +469,13 @@ export async function fetchBacktestSummaryAction(code: string) {
   }
 }
 
+export async function getDebugInfoAction() {
+  return {
+    BACKEND_URL,
+    supabaseInitialized: !!supabase,
+    envKeys: Object.keys(process.env).filter(k => k.includes("SUPABASE") || k.includes("BACKEND"))
+  };
+}
+
+
 
