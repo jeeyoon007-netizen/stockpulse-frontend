@@ -595,29 +595,58 @@ export default function DashboardPage() {
 
                 {/* 백테스트 요약 결과 뱃지 UI */}
                 {backtestSummary && (
-                  <div className="flex flex-wrap items-center gap-2 md:gap-3 p-3.5 bg-background/50 border border-primary/20 rounded-xl shadow-sm animate-in fade-in duration-300 w-full mt-2">
-                    <div className="flex items-center gap-1.5 shrink-0 bg-primary/10 text-primary px-2.5 py-1 rounded-md">
-                      <Target className="w-4 h-4" />
-                      <span className="font-bold text-sm">AI 최적전략: {backtestSummary.best_strategy_name}</span>
+                  <div className="flex flex-col gap-2 w-full mt-2 animate-in fade-in duration-300">
+                    <div className="flex flex-wrap items-center gap-2 md:gap-3 p-3.5 bg-background/50 border border-primary/20 rounded-xl shadow-sm w-full">
+                      <div className="flex items-center gap-1.5 shrink-0 bg-primary/10 text-primary px-2.5 py-1 rounded-md">
+                        <Target className="w-4 h-4" />
+                        <span className="font-bold text-sm">AI 최적전략: {backtestSummary.best_strategy_name}</span>
+                      </div>
+                      <Separator orientation="vertical" className="h-4 hidden sm:block bg-border/50" />
+                      <div className="flex items-center gap-3 text-sm">
+                        <div className="flex items-center gap-1.5">
+                          <Activity className="w-4 h-4 text-muted-foreground" />
+                          <span className="text-muted-foreground text-xs font-medium">과거 1년 승률</span>
+                          <span className="font-black font-mono text-base">{backtestSummary.win_rate}%</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          {backtestSummary.total_return > 0 ? <TrendingUp className="w-4 h-4 text-stock-up" /> : <TrendingDown className="w-4 h-4 text-stock-down" />}
+                          <span className="text-muted-foreground text-xs font-medium">복리누적</span>
+                          <span className={`font-black font-mono text-base ${backtestSummary.total_return > 0 ? 'text-stock-up' : 'text-stock-down'}`}>
+                            {backtestSummary.total_return}%
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1 ml-1 md:ml-3">
+                          <span className="text-[10px] text-muted-foreground/80 bg-muted/50 px-2 py-0.5 rounded border border-border/50 font-mono">최대 낙폭: {backtestSummary.mdd}%</span>
+                        </div>
+                      </div>
                     </div>
-                    <Separator orientation="vertical" className="h-4 hidden sm:block bg-border/50" />
-                    <div className="flex items-center gap-3 text-sm">
-                      <div className="flex items-center gap-1.5">
-                        <Activity className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-muted-foreground text-xs font-medium">과거 1년 승률</span>
-                        <span className="font-black font-mono text-base">{backtestSummary.win_rate}%</span>
+
+                    {/* 모든 전략 비교 테이블 (단타/스윙/장기) */}
+                    {backtestSummary.all_strategies && backtestSummary.all_strategies.length > 0 && (
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 w-full">
+                        {backtestSummary.all_strategies.map((st: any, idx: number) => {
+                          const isBest = st.strategy_name === backtestSummary.best_strategy_name;
+                          const modeMap: any = { "AI 분석 (단타)": "단타 모드", "AI 분석 (스윙)": "스윙 모드", "AI 분석 (장기투자)": "장기 모드" };
+                          const label = modeMap[st.strategy_name] || st.strategy_name;
+                          return (
+                            <div key={idx} className={`flex flex-col p-2.5 rounded-lg border transition-all ${isBest ? 'bg-primary/5 border-primary/30 shadow-sm' : 'bg-background/40 border-border/50'}`}>
+                              <div className="flex justify-between items-center mb-1.5">
+                                <span className={`text-xs font-bold ${isBest ? 'text-primary' : 'text-muted-foreground'}`}>
+                                  {label} {isBest && <span className="text-[9px] bg-primary/20 text-primary px-1 py-0.5 rounded ml-1">최적</span>}
+                                </span>
+                                <span className={`font-mono text-sm font-black ${st.total_return > 0 ? 'text-stock-up' : 'text-stock-down'}`}>
+                                  {st.total_return > 0 ? '+' : ''}{st.total_return}%
+                                </span>
+                              </div>
+                              <div className="flex justify-between items-center text-[10px] text-muted-foreground font-medium">
+                                <span>승률: <span className="font-mono">{st.win_rate}%</span></span>
+                                <span>최대 낙폭: <span className="font-mono">{st.mdd}%</span></span>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
-                      <div className="flex items-center gap-1.5">
-                        {backtestSummary.total_return > 0 ? <TrendingUp className="w-4 h-4 text-stock-up" /> : <TrendingDown className="w-4 h-4 text-stock-down" />}
-                        <span className="text-muted-foreground text-xs font-medium">복리누적</span>
-                        <span className={`font-black font-mono text-base ${backtestSummary.total_return > 0 ? 'text-stock-up' : 'text-stock-down'}`}>
-                          {backtestSummary.total_return}%
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1 ml-1 md:ml-3">
-                        <span className="text-[10px] text-muted-foreground/80 bg-muted/50 px-2 py-0.5 rounded border border-border/50 font-mono">최대낙폭(MDD): {backtestSummary.mdd}%</span>
-                      </div>
-                    </div>
+                    )}
                   </div>
                 )}
 
