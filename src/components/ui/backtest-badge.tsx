@@ -51,7 +51,7 @@ export function BacktestBadge({ stockCode }: BacktestBadgeProps) {
         </Badge>
       </div>
       <div className="text-[10px] text-muted-foreground/70 ml-1">
-        * 과거 1년 백테스트 결과 (MDD: {data.mdd}%)
+        * 과거 1년 백테스트 결과 (최대 낙폭: {data.mdd}%)
       </div>
     </div>
   );
