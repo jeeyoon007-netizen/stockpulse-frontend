@@ -59,6 +59,15 @@ export default function HistoryPage() {
     fetchWatchlist(sanitized);
   };
 
+  const handleResetNickname = () => {
+    if (window.confirm("현재 설정된 닉네임을 초기화하고 다시 설정하시겠습니까?")) {
+      localStorage.removeItem("stockpulse_nickname");
+      setNickname(null);
+      setWatchlist([]);
+      promptNickname();
+    }
+  };
+
   const fetchWatchlist = async (nick: string) => {
     setIsLoading(true);
     try {
@@ -114,7 +123,11 @@ export default function HistoryPage() {
             {nickname ? `'${nickname}' 님의 백테스트 관심 리스트` : "닉네임을 설정하고 관심 종목을 추가해보세요"}
           </p>
         </div>
-        {!nickname && (
+        {nickname ? (
+          <Button variant="outline" size="sm" onClick={handleResetNickname}>
+            닉네임 재설정
+          </Button>
+        ) : (
           <Button variant="outline" size="sm" onClick={promptNickname}>
             닉네임 설정하기
           </Button>
