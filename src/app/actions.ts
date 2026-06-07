@@ -13,6 +13,7 @@ export interface AIAnalysisResult {
   marketStateLabel: string;
   persistCycleRemaining: number;
   indicators?: any;
+  swingLevels?: any[];
 }
 import { supabase } from "@/lib/supabase";
 

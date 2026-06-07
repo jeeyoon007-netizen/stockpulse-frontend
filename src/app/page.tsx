@@ -67,6 +67,9 @@ const STATE_STYLES = {
   HOLD:            { color: "text-amber-500",      bg: "bg-amber-500/10",  border: "border-amber-500/30" },
   BEARISH_CAUTION: { color: "text-blue-400",      bg: "bg-blue-400/10",   border: "border-blue-400/30" },
   EXIT_PRIORITY:   { color: "text-blue-500",      bg: "bg-blue-500/10", border: "border-blue-500/30" },
+  ACCUMULATION_WATCH: { color: "text-emerald-500", bg: "bg-emerald-500/10", border: "border-emerald-500/30" },
+  MARKUP_CONFIRMED:   { color: "text-orange-500",  bg: "bg-orange-500/10",  border: "border-orange-500/30" },
+  DISTRIBUTION_WARNING: { color: "text-purple-500", bg: "bg-purple-500/10", border: "border-purple-500/30" },
 } as const;
 
 const VERDICT_LABELS = {
@@ -678,7 +681,16 @@ export default function DashboardPage() {
                 {/* 차트 영역을 분석 종목 주가 정보 밑(3인 전문가 및 기타 상세 의견 위)에 위치시킴 */}
                 {analysisResult.stockData.ohlcv && (
                   <div className="bg-background/40 rounded-xl overflow-hidden border border-border/50 p-2 shadow-inner mt-2 animate-in fade-in duration-500 w-full">
-                    <TradingViewChart data={analysisResult.stockData.ohlcv} trades={backtestTrades} />
+                    <TradingViewChart 
+                      data={analysisResult.stockData.ohlcv} 
+                      trades={backtestTrades} 
+                      swingLevels={analysisResult.analysis?.swingLevels}
+                      volumeProfile={{
+                        poc: analysisResult.analysis?.indicators?.volumeProfile240?.poc,
+                        vah: analysisResult.analysis?.indicators?.volumeProfile240?.vah,
+                        val: analysisResult.analysis?.indicators?.volumeProfile240?.val,
+                      }}
+                    />
                   </div>
                 )}
 

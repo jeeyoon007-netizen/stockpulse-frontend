@@ -18,12 +18,27 @@ interface TradeMarker {
   price: number;
 }
 
+export interface SwingLevel {
+  price: number;
+  type: 'HIGH' | 'LOW';
+  index: number;
+  strength: number;
+}
+
+export interface VolumeProfileData {
+  poc?: number;
+  vah?: number;
+  val?: number;
+}
+
 interface TradingViewChartProps {
   data: OHLCV[];
   trades?: TradeMarker[];
+  swingLevels?: SwingLevel[];
+  volumeProfile?: VolumeProfileData;
 }
 
-export function TradingViewChart({ data, trades }: TradingViewChartProps) {
+export function TradingViewChart({ data, trades, swingLevels, volumeProfile }: TradingViewChartProps) {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const [isMobile, setIsMobile] = useState(false);
 
@@ -113,6 +128,55 @@ export function TradingViewChart({ data, trades }: TradingViewChartProps) {
       });
       // @ts-ignore
       candleSeries.setMarkers(markers);
+    }
+
+    // 스윙 레벨 (지지/저항선) 추가
+    if (swingLevels && swingLevels.length > 0) {
+      swingLevels.forEach((level) => {
+        const isHigh = level.type === 'HIGH';
+        candleSeries.createPriceLine({
+          price: level.price,
+          color: isHigh ? 'rgba(239, 68, 68, 0.4)' : 'rgba(59, 130, 246, 0.4)', // 붉은색(저항), 푸른색(지지) + 투명도
+          lineWidth: isHigh ? 1 : 2,
+          lineStyle: 2, // 2: Dashed
+          axisLabelVisible: true,
+          title: isHigh ? 'Res' : 'Sup',
+        });
+      });
+    }
+
+    // 볼륨 프로파일 (POC, VAH, VAL) 추가
+    if (volumeProfile) {
+      if (volumeProfile.poc) {
+        candleSeries.createPriceLine({
+          price: volumeProfile.poc,
+          color: 'rgba(234, 179, 8, 0.7)', // 뚜렷한 노란색/금색
+          lineWidth: 2,
+          lineStyle: 0, // 0: Solid
+          axisLabelVisible: true,
+          title: 'POC',
+        });
+      }
+      if (volumeProfile.vah) {
+        candleSeries.createPriceLine({
+          price: volumeProfile.vah,
+          color: 'rgba(156, 163, 175, 0.5)', // 연한 회색
+          lineWidth: 1,
+          lineStyle: 2, // Dashed
+          axisLabelVisible: true,
+          title: 'VAH',
+        });
+      }
+      if (volumeProfile.val) {
+        candleSeries.createPriceLine({
+          price: volumeProfile.val,
+          color: 'rgba(156, 163, 175, 0.5)', // 연한 회색
+          lineWidth: 1,
+          lineStyle: 2, // Dashed
+          axisLabelVisible: true,
+          title: 'VAL',
+        });
+      }
     }
 
     chart.timeScale().fitContent();
