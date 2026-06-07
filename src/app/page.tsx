@@ -680,7 +680,7 @@ export default function DashboardPage() {
 
                 {/* 차트 영역을 분석 종목 주가 정보 밑(3인 전문가 및 기타 상세 의견 위)에 위치시킴 */}
                 {analysisResult.stockData.ohlcv && (
-                  <div className="bg-background/40 rounded-xl overflow-hidden border border-border/50 p-2 shadow-inner mt-2 animate-in fade-in duration-500 w-full">
+                  <div className="bg-background/40 rounded-xl overflow-hidden border border-border/50 p-3 shadow-inner mt-2 animate-in fade-in duration-500 w-full">
                     <TradingViewChart 
                       data={analysisResult.stockData.ohlcv} 
                       trades={backtestTrades} 
@@ -691,6 +691,30 @@ export default function DashboardPage() {
                         val: analysisResult.analysis?.indicators?.volumeProfile240?.val,
                       }}
                     />
+                    
+                    {/* 선 지표 설명 안내 영역 */}
+                    <div className="mt-3 px-2 pt-3 border-t border-border/30 grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-muted-foreground">
+                      <div className="space-y-1">
+                        <span className="font-bold text-foreground flex items-center gap-1.5">
+                          <span className="w-1 h-3 bg-amber-500 rounded-sm"></span>
+                          📊 볼륨 프로파일 (Volume Profile)
+                        </span>
+                        <p className="leading-relaxed text-[11px] text-muted-foreground/95">
+                          <span className="text-amber-400 font-semibold">🟡 POC (Point of Control)</span>: 가장 많은 거래량이 누적된 핵심 가격대로 강력한 지지/저항 역할을 합니다.<br/>
+                          <span className="text-foreground/70 font-semibold">⚪ VAH / VAL (가치영역 상/하단)</span>: 매물의 약 70%가 집중된 구간의 경계선입니다.
+                        </p>
+                      </div>
+                      <div className="space-y-1">
+                        <span className="font-bold text-foreground flex items-center gap-1.5">
+                          <span className="w-1 h-3 bg-primary rounded-sm"></span>
+                          📈 스윙 구조선 (Swing Levels)
+                        </span>
+                        <p className="leading-relaxed text-[11px] text-muted-foreground/95">
+                          <span className="text-red-400 font-semibold">🔴 Res (Resistance)</span>: 최근 고점들을 연결한 매물 저항 구간입니다.<br/>
+                          <span className="text-blue-400 font-semibold">🔵 Sup (Support)</span>: 최근 저점들을 연결한 매물 지지 구간이자 주요 손절선입니다.
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 )}
 

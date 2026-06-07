@@ -108,6 +108,8 @@ export function TradingViewChart({ data, trades, swingLevels, volumeProfile }: T
       borderVisible: false,
       wickUpColor: "#ef4444",
       wickDownColor: "#3b82f6",
+      lastValueVisible: false, // 현재가 라벨 숨기기
+      priceLineVisible: false, // 현재가 수평선 숨기기
     });
 
     candleSeries.setData(chartData as any);
