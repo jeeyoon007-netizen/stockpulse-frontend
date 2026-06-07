@@ -174,8 +174,23 @@ export default function DashboardPage() {
       fetchBacktestSummaryAction(analysisResult.stockData.code)
         .then(json => {
           if (json.success && json.data) {
-            setBacktestTrades(json.data.trades || []);
             setBacktestSummary(json.data);
+            
+            // 현재 선택된 mode에 매칭되는 trades를 동적으로 필터링하여 설정
+            if (json.data.all_strategies) {
+              const modeLabelMapping: Record<string, string> = {
+                'scalp': 'AI 분석 (단타)',
+                'swing': 'AI 분석 (스윙)',
+                'position': 'AI 분석 (장기투자)'
+              };
+              const targetLabel = modeLabelMapping[mode];
+              const targetStrategy = json.data.all_strategies.find((s: any) => s.strategy_name === targetLabel);
+              if (targetStrategy && targetStrategy.trades) {
+                setBacktestTrades(targetStrategy.trades);
+                return;
+              }
+            }
+            setBacktestTrades(json.data.trades || []);
           } else {
             setBacktestTrades([]);
             setBacktestSummary(null);
@@ -198,6 +213,26 @@ export default function DashboardPage() {
       setBacktestError(null);
     }
   }, [analysisResult]);
+
+  // 사용자가 선택한 mode 탭이 바뀌거나 backtestSummary가 새로 로드되었을 때,
+  // 그에 부합하는 개별 전략의 trades를 즉시 추출하여 차트에 반영 (렉 없는 즉각 전환)
+  useEffect(() => {
+    if (backtestSummary && backtestSummary.all_strategies) {
+      const modeLabelMapping: Record<string, string> = {
+        'scalp': 'AI 분석 (단타)',
+        'swing': 'AI 분석 (스윙)',
+        'position': 'AI 분석 (장기투자)'
+      };
+      const targetLabel = modeLabelMapping[mode];
+      const targetStrategy = backtestSummary.all_strategies.find((s: any) => s.strategy_name === targetLabel);
+      if (targetStrategy && targetStrategy.trades) {
+        setBacktestTrades(targetStrategy.trades);
+      } else {
+        // 일치하는 전략이 없을 때의 폴백
+        setBacktestTrades(backtestSummary.trades || []);
+      }
+    }
+  }, [mode, backtestSummary]);
 
   const filteredStocks = searchInput
     ? stocks.filter(s => s.name.toLowerCase().includes(searchInput.toLowerCase()) || s.code.includes(searchInput)).slice(0, 6)
