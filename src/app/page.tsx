@@ -586,6 +586,31 @@ export default function DashboardPage() {
                               🚨 거부권 발동
                             </Badge>
                           )}
+
+                          {/* 4. 변동성 레지임 배지 */}
+                          {analysisResult.analysis.indicators?.volatilityRegime && (
+                            <Badge 
+                              variant="outline"
+                              className={`border-current font-bold ${
+                                analysisResult.analysis.indicators.volatilityRegime === 'EXTREME' ? 'bg-red-500/20 text-red-400 border-red-500/30 shadow-[0_0_8px_rgba(239,68,68,0.2)]' :
+                                analysisResult.analysis.indicators.volatilityRegime === 'HIGH' ? 'bg-orange-500/20 text-orange-400 border-orange-500/30 shadow-[0_0_8px_rgba(249,115,22,0.2)]' :
+                                analysisResult.analysis.indicators.volatilityRegime === 'LOW' ? 'bg-green-500/20 text-green-400 border-green-500/30 shadow-[0_0_8px_rgba(34,197,94,0.2)]' :
+                                'bg-blue-500/20 text-blue-400 border-blue-500/30 shadow-[0_0_8px_rgba(59,130,246,0.2)]'
+                              }`}
+                            >
+                              변동성: {analysisResult.analysis.indicators.volatilityRegime}
+                            </Badge>
+                          )}
+
+                          {/* 5. TTM Squeeze 배지 */}
+                          {analysisResult.analysis.indicators?.isSqueezed && (
+                            <Badge 
+                              variant="outline"
+                              className="border-current font-bold bg-purple-500/20 text-purple-400 border-purple-500/30 shadow-[0_0_8px_rgba(168,85,247,0.2)]"
+                            >
+                              ⚡ TTM Squeeze 진행중
+                            </Badge>
+                          )}
                         </>
                       )}
 
@@ -674,6 +699,7 @@ export default function DashboardPage() {
                     </div>
                   </div>
                 )}
+
 
                 {/* 3인 전문가 카드 */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
