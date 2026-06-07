@@ -92,7 +92,7 @@ export default function HistoryPage() {
 
   const filteredList = watchlist.filter((item) =>
     getDisplayStockName(item).toLowerCase().includes(searchFilter.toLowerCase()) || 
-    item.stock_code.includes(searchFilter)
+    item.stock_code.toLowerCase().includes(searchFilter.toLowerCase())
   );
 
   const removeItem = async (stockCode: string) => {

@@ -200,7 +200,7 @@ export default function DashboardPage() {
   }, [analysisResult]);
 
   const filteredStocks = searchInput
-    ? stocks.filter(s => s.name.includes(searchInput) || s.code.includes(searchInput)).slice(0, 6)
+    ? stocks.filter(s => s.name.toLowerCase().includes(searchInput.toLowerCase()) || s.code.includes(searchInput)).slice(0, 6)
     : [];
 
   const loadingMessages = [
@@ -226,7 +226,7 @@ export default function DashboardPage() {
     
     let finalCode = target;
     if (!/^\d+$/.test(target)) {
-      const match = activeStocks.find(s => s.name === target);
+      const match = activeStocks.find(s => s.name.toLowerCase() === target.toLowerCase());
       if (match) {
         finalCode = match.code;
         setStockCode(finalCode);
