@@ -8,6 +8,7 @@ import {
   TrendingUp,
   ChevronLeft,
   ChevronRight,
+  Star,
 } from "lucide-react";
 import { useState } from "react";
 import { Separator } from "@/components/ui/separator";
@@ -25,9 +26,9 @@ const menuItems = [
     icon: LayoutDashboard,
   },
   {
-    label: "관심종목 List",
-    href: "/history",
-    icon: History,
+    label: "관심종목 Dashboard",
+    href: "/watchlist",
+    icon: Star,
   },
 ];
 

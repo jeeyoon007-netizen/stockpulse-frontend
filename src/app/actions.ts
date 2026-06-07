@@ -14,6 +14,11 @@ export interface AIAnalysisResult {
   persistCycleRemaining: number;
   indicators?: any;
   swingLevels?: any[];
+  wyckoffPhase?: {
+    phase: string;
+    confidence: number;
+    description: string;
+  };
 }
 import { supabase } from "@/lib/supabase";
 
@@ -408,6 +413,77 @@ export async function fetchWatchlistAction(nickname: string) {
   } catch (e: any) {
     console.error("fetchWatchlistAction error:", e);
     return { success: false, error: e.message || "Failed to fetch watchlist" };
+  }
+}
+
+/**
+ * 관심종목 상세 대시보드 데이터 (Watchlist + Backtest + Wyckoff) 조회 서버 액션
+ */
+export async function fetchWatchlistDetailsAction(nickname: string) {
+  try {
+    // 1. 기본 관심종목 리스트 조회
+    const watchlistRes = await fetchWatchlistAction(nickname);
+    if (!watchlistRes.success || !watchlistRes.data || watchlistRes.data.length === 0) {
+      return { success: true, data: [] };
+    }
+
+    const watchlists = watchlistRes.data;
+    const stockCodes = watchlists.map((w: any) => w.stock_code);
+
+    if (!supabase) throw new Error("Supabase 클라이언트가 초기화되지 않았습니다.");
+
+    // 2. 백테스트 결과 병렬 조회
+    const { data: backtests, error: backtestErr } = await supabase
+      .from('backtest_results')
+      .select('stock_code, best_strategy_name, win_rate, total_return, mdd, trade_count')
+      .in('stock_code', stockCodes);
+
+    if (backtestErr) console.error("Watchlist Backtest Error:", backtestErr.message);
+
+    // 3. 최근 분석 로그 (Wyckoff 국면) 병렬 조회
+    // 가장 최근 분석된 결과만 가져오기 위해 각 종목별로 최신 1건씩 가져와야 함
+    // (supabase rpc 또는 in 쿼리 후 코드별 맵핑 처리)
+    const { data: analysisLogs, error: logErr } = await supabase
+      .from('analysis_logs')
+      .select('stock_code, wyckoff_phase, wyckoff_confidence, analyzed_at')
+      .in('stock_code', stockCodes)
+      .order('analyzed_at', { ascending: false });
+
+    if (logErr) console.error("Watchlist Analysis Logs Error:", logErr.message);
+
+    // 중복 제거: 각 종목별 가장 최신 로그만 추출
+    const latestLogsMap = new Map();
+    if (analysisLogs) {
+      analysisLogs.forEach(log => {
+        if (!latestLogsMap.has(log.stock_code)) {
+          latestLogsMap.set(log.stock_code, log);
+        }
+      });
+    }
+
+    const backtestMap = new Map();
+    if (backtests) {
+      backtests.forEach(b => backtestMap.set(b.stock_code, b));
+    }
+
+    // 4. 데이터 합성
+    const combinedData = watchlists.map((w: any) => {
+      const bt = backtestMap.get(w.stock_code);
+      const log = latestLogsMap.get(w.stock_code);
+      return {
+        ...w,
+        backtest: bt || null,
+        wyckoff: log ? {
+          phase: log.wyckoff_phase,
+          confidence: log.wyckoff_confidence
+        } : null
+      };
+    });
+
+    return { success: true, data: combinedData };
+  } catch (err: any) {
+    console.error("fetchWatchlistDetailsAction error:", err);
+    return { success: false, error: err.message };
   }
 }
 

@@ -48,6 +48,25 @@ import { WatchlistButton } from "@/components/ui/watchlist-button";
 import { type FearGreedResponse } from "@/lib/api/feargreed";
 import { type IndexPriceData } from "@/lib/api/kis-market";
 
+// 클라이언트 측 메모리 캐시 (관심종목 <-> 대시보드 전환 시 백엔드 재조회 방지용)
+interface MemoryCache {
+  analysis: Record<string, { timestamp: number; data: StockAnalysisResponse }>;
+  backtest: Record<string, { timestamp: number; data: any }>;
+  marketOverview: { timestamp: number; data: IndexPriceData[] } | null;
+  fearGreedData: { timestamp: number; data: FearGreedResponse } | null;
+  canaryData: { timestamp: number; data: any } | null;
+}
+
+const clientMemoryCache: MemoryCache = {
+  analysis: {},
+  backtest: {},
+  marketOverview: null,
+  fearGreedData: null,
+  canaryData: null,
+};
+
+const MEMORY_CACHE_EXPIRY_MS = 5 * 60 * 1000; // 5분 캐시 만료 시간
+
 const ANALYSIS_MODES = [
   { key: "scalp",    label: "단타",  desc: "모멘텀 우선 (당일~3일)" },
   { key: "swing",    label: "스윙",  desc: "추세 중심 (1~4주)" },
@@ -152,10 +171,43 @@ export default function DashboardPage() {
       })
       .catch(err => console.error("stocks.json 로드 실패:", err));
 
-    // 시장 지표 로드
-    fetchMarketOverviewAction().then(setMarketOverview);
-    fetchFearGreedAction().then(setFearGreedData);
-    fetchCanaryDataAction().then(setCanaryData);
+    // 시장 지표 로드 (메모리 캐시 확인)
+    const cachedMarketOverview = clientMemoryCache.marketOverview;
+    if (cachedMarketOverview && Date.now() - cachedMarketOverview.timestamp < MEMORY_CACHE_EXPIRY_MS) {
+      console.log("[MEMORY CACHE HIT] Loaded market overview from memory.");
+      setMarketOverview(cachedMarketOverview.data);
+    } else {
+      fetchMarketOverviewAction().then(data => {
+        setMarketOverview(data);
+        clientMemoryCache.marketOverview = { timestamp: Date.now(), data };
+      });
+    }
+
+    const cachedFearGreed = clientMemoryCache.fearGreedData;
+    if (cachedFearGreed && Date.now() - cachedFearGreed.timestamp < MEMORY_CACHE_EXPIRY_MS) {
+      console.log("[MEMORY CACHE HIT] Loaded fear & greed data from memory.");
+      setFearGreedData(cachedFearGreed.data);
+    } else {
+      fetchFearGreedAction().then(data => {
+        if (data) {
+          setFearGreedData(data);
+          clientMemoryCache.fearGreedData = { timestamp: Date.now(), data };
+        }
+      });
+    }
+
+    const cachedCanary = clientMemoryCache.canaryData;
+    if (cachedCanary && Date.now() - cachedCanary.timestamp < MEMORY_CACHE_EXPIRY_MS) {
+      console.log("[MEMORY CACHE HIT] Loaded canary data from memory.");
+      setCanaryData(cachedCanary.data);
+    } else {
+      fetchCanaryDataAction().then(data => {
+        if (data) {
+          setCanaryData(data);
+          clientMemoryCache.canaryData = { timestamp: Date.now(), data };
+        }
+      });
+    }
   }, []);
 
   // --- [AI Engine State] ---
@@ -171,9 +223,43 @@ export default function DashboardPage() {
   useEffect(() => {
     if (analysisResult?.success && analysisResult.stockData?.code) {
       setBacktestError(null);
-      fetchBacktestSummaryAction(analysisResult.stockData.code)
+      const code = analysisResult.stockData.code;
+
+      // 1. 메모리 캐시 확인
+      const memoryCached = clientMemoryCache.backtest[code];
+      if (memoryCached && Date.now() - memoryCached.timestamp < MEMORY_CACHE_EXPIRY_MS) {
+        console.log(`[MEMORY CACHE HIT] Loaded backtest summary for ${code} from memory.`);
+        const cachedData = memoryCached.data;
+        setBacktestSummary(cachedData);
+        
+        // 현재 선택된 mode에 매칭되는 trades를 동적으로 필터링하여 설정
+        if (cachedData.all_strategies) {
+          const modeLabelMapping: Record<string, string> = {
+            'scalp': 'AI 분석 (단타)',
+            'swing': 'AI 분석 (스윙)',
+            'position': 'AI 분석 (장기투자)'
+          };
+          const targetLabel = modeLabelMapping[mode];
+          const targetStrategy = cachedData.all_strategies.find((s: any) => s.strategy_name === targetLabel);
+          if (targetStrategy && targetStrategy.trades) {
+            setBacktestTrades(targetStrategy.trades);
+            return;
+          }
+        }
+        setBacktestTrades(cachedData.trades || []);
+        return;
+      }
+
+      // 2. 캐시 미스 시 백엔드 조회
+      fetchBacktestSummaryAction(code)
         .then(json => {
           if (json.success && json.data) {
+            // 메모리 캐시 저장
+            clientMemoryCache.backtest[code] = {
+              timestamp: Date.now(),
+              data: json.data
+            };
+
             setBacktestSummary(json.data);
             
             // 현재 선택된 mode에 매칭되는 trades를 동적으로 필터링하여 설정
@@ -271,16 +357,32 @@ export default function DashboardPage() {
       }
     }
 
-    // 1. 세션 스토리지 캐시 확인 (강제 새로고침이 아닐 때)
-    const cacheKey = `stockpulse_analysis_cache_${finalCode}_${activeMode}`;
+    // 1. 메모리 캐시 및 세션 스토리지 캐시 확인 (강제 새로고침이 아닐 때)
+    const memoryCacheKey = `${finalCode}_${activeMode}`;
+    const sessionStorageKey = `stockpulse_analysis_cache_${finalCode}_${activeMode}`;
+    
     if (!forceRefresh) {
-      const cached = sessionStorage.getItem(cacheKey);
+      // 1-1. 메모리 캐시 확인
+      const memoryCached = clientMemoryCache.analysis[memoryCacheKey];
+      if (memoryCached && Date.now() - memoryCached.timestamp < MEMORY_CACHE_EXPIRY_MS) {
+        console.log(`[MEMORY CACHE HIT] Loaded analysis for ${finalCode} (${activeMode}) from memory.`);
+        setAnalysisResult(memoryCached.data);
+        setIsAnalyzing(false);
+        return;
+      }
+
+      // 1-2. 세션 스토리지 캐시 확인
+      const cached = sessionStorage.getItem(sessionStorageKey);
       if (cached) {
         try {
           const { timestamp, data } = JSON.parse(cached);
-          const CACHE_EXPIRY_MS = 5 * 60 * 1000; // 5분
-          if (Date.now() - timestamp < CACHE_EXPIRY_MS) {
-            console.log(`[CACHE HIT] Loaded analysis for ${finalCode} (${activeMode}) from sessionStorage.`);
+          if (Date.now() - timestamp < MEMORY_CACHE_EXPIRY_MS) {
+            console.log(`[SESSION CACHE HIT] Loaded analysis for ${finalCode} (${activeMode}) from sessionStorage.`);
+            // 메모리 캐시 동기화
+            clientMemoryCache.analysis[memoryCacheKey] = {
+              timestamp,
+              data
+            };
             setAnalysisResult(data);
             setIsAnalyzing(false);
             return;
@@ -289,6 +391,11 @@ export default function DashboardPage() {
           console.error("캐시 파싱 에러:", e);
         }
       }
+    } else {
+      // 강제 새로고침인 경우 해당 종목의 메모리/세션 캐시 모두 제거
+      delete clientMemoryCache.analysis[memoryCacheKey];
+      delete clientMemoryCache.backtest[finalCode];
+      sessionStorage.removeItem(sessionStorageKey);
     }
 
     setIsAnalyzing(true);
@@ -313,9 +420,15 @@ export default function DashboardPage() {
         localStorage.setItem("stockpulse_last_analyzed_code", result.stockData.code);
         localStorage.setItem("stockpulse_last_analyzed_name", result.stockData.name || stockMatch?.name || finalCode);
         
-        // 캐시 저장
-        sessionStorage.setItem(cacheKey, JSON.stringify({
-          timestamp: Date.now(),
+        // 메모리 캐시 및 세션 캐시 저장
+        const now = Date.now();
+        clientMemoryCache.analysis[memoryCacheKey] = {
+          timestamp: now,
+          data: result
+        };
+
+        sessionStorage.setItem(sessionStorageKey, JSON.stringify({
+          timestamp: now,
           data: result
         }));
       }
