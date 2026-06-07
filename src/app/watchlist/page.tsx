@@ -24,28 +24,62 @@ interface WatchlistItem {
 
 export default function WatchlistPage() {
   const router = useRouter();
+  const [nickname, setNickname] = useState<string | null>(null);
   const [items, setItems] = useState<WatchlistItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function loadWatchlist() {
-      const nick = localStorage.getItem("stockpulse_nickname");
-      if (!nick) {
-        setIsLoading(false);
-        return;
-      }
-
+  const loadWatchlist = async (nick: string) => {
+    setIsLoading(true);
+    setError(null);
+    try {
       const res = await fetchWatchlistDetailsAction(nick);
       if (res.success && res.data) {
         setItems(res.data);
       } else {
         setError(res.error || "관심종목을 불러오는 중 오류가 발생했습니다.");
       }
+    } catch (e: any) {
+      setError(e.message || "관심종목을 불러오는 중 오류가 발생했습니다.");
+    } finally {
       setIsLoading(false);
     }
+  };
 
-    loadWatchlist();
+  const promptNickname = () => {
+    const input = window.prompt("관심 종목을 저장할 닉네임을 입력하세요 (최대 한글 5글자)\n※ 잊을 경우 복원할 수 없으니 주의하세요.");
+    if (!input) {
+      setIsLoading(false);
+      return;
+    }
+    const sanitized = input.replace(/\s/g, '').toLowerCase().slice(0, 5);
+    if (sanitized.length === 0) {
+      setIsLoading(false);
+      return;
+    }
+    
+    localStorage.setItem("stockpulse_nickname", sanitized);
+    setNickname(sanitized);
+    loadWatchlist(sanitized);
+  };
+
+  const handleResetNickname = () => {
+    if (window.confirm("현재 설정된 닉네임을 초기화하고 다시 설정하시겠습니까?")) {
+      localStorage.removeItem("stockpulse_nickname");
+      setNickname(null);
+      setItems([]);
+      promptNickname();
+    }
+  };
+
+  useEffect(() => {
+    const storedNickname = localStorage.getItem("stockpulse_nickname");
+    if (storedNickname) {
+      setNickname(storedNickname);
+      loadWatchlist(storedNickname);
+    } else {
+      promptNickname();
+    }
   }, []);
 
   const getWyckoffColor = (phase: string | null | undefined) => {
@@ -88,12 +122,23 @@ export default function WatchlistPage() {
             나의 관심 종목
           </h1>
           <p className="text-muted-foreground">
-            저장한 종목들의 와이코프 국면과 백테스트 AI 분석 결과를 한눈에 확인하세요.
+            {nickname ? `'${nickname}' 님의 관심종목 리스트 - 와이코프 국면과 백테스트 AI 분석 결과를 한눈에 확인하세요.` : "닉네임을 설정하고 관심 종목을 추가해보세요"}
           </p>
         </div>
-        <Button variant="outline" onClick={() => router.push('/')}>
-          시장 뷰로 돌아가기
-        </Button>
+        <div className="flex items-center gap-2">
+          {nickname ? (
+            <Button variant="outline" size="sm" onClick={handleResetNickname}>
+              닉네임 재설정
+            </Button>
+          ) : (
+            <Button variant="outline" size="sm" onClick={promptNickname}>
+              닉네임 설정하기
+            </Button>
+          )}
+          <Button variant="outline" size="sm" onClick={() => router.push('/')}>
+            시장 뷰로 돌아가기
+          </Button>
+        </div>
       </div>
 
       {error && (

@@ -2,12 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, History } from "lucide-react";
+import { LayoutDashboard, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const mobileMenuItems = [
-  { label: "대시보드", href: "/", icon: LayoutDashboard },
-  { label: "관심종목 List", href: "/history", icon: History },
+  { label: "AI STOCK", href: "/", icon: LayoutDashboard },
+  { label: "관심종목 List", href: "/watchlist", icon: Star },
 ];
 
 export function MobileNav() {

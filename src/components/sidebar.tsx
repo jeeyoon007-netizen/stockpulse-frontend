@@ -21,12 +21,12 @@ import { cn } from "@/lib/utils";
 
 const menuItems = [
   {
-    label: "대시보드",
+    label: "AI STOCK",
     href: "/",
     icon: LayoutDashboard,
   },
   {
-    label: "관심종목 Dashboard",
+    label: "관심종목 List",
     href: "/watchlist",
     icon: Star,
   },
