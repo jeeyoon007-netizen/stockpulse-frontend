@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { fetchWatchlistDetailsAction } from "@/app/actions";
+import { fetchWatchlistDetailsAction, fetchBacktestSummaryAction } from "@/app/actions";
 import { Star, TrendingUp, AlertTriangle, Info, ArrowRight, ShieldCheck, Zap, Activity } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -82,28 +82,6 @@ export default function WatchlistPage() {
     }
   }, []);
 
-  const getWyckoffColor = (phase: string | null | undefined) => {
-    if (!phase) return "bg-gray-500/10 text-gray-400 border-gray-500/20";
-    switch (phase.toLowerCase()) {
-      case "accumulation": return "bg-blue-500/10 text-blue-400 border-blue-500/20";
-      case "markup": return "bg-green-500/10 text-green-400 border-green-500/20";
-      case "distribution": return "bg-red-500/10 text-red-400 border-red-500/20";
-      case "markdown": return "bg-orange-500/10 text-orange-400 border-orange-500/20";
-      default: return "bg-gray-500/10 text-gray-400 border-gray-500/20";
-    }
-  };
-
-  const getWyckoffIcon = (phase: string | null | undefined) => {
-    if (!phase) return <Info className="w-4 h-4 mr-1" />;
-    switch (phase.toLowerCase()) {
-      case "accumulation": return <ShieldCheck className="w-4 h-4 mr-1" />;
-      case "markup": return <TrendingUp className="w-4 h-4 mr-1" />;
-      case "distribution": return <AlertTriangle className="w-4 h-4 mr-1" />;
-      case "markdown": return <Activity className="w-4 h-4 mr-1" />;
-      default: return <Info className="w-4 h-4 mr-1" />;
-    }
-  };
-
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh]">
@@ -162,77 +140,135 @@ export default function WatchlistPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {items.map((item) => (
-            <div 
-              key={item.stock_code} 
-              className="group relative overflow-hidden rounded-2xl border border-white/10 bg-card/40 hover:bg-card/60 backdrop-blur-md transition-all duration-300 hover:shadow-xl hover:shadow-primary/5 hover:-translate-y-1 cursor-pointer flex flex-col"
+            <WatchlistCard 
+              key={item.stock_code}
+              item={item}
               onClick={() => router.push(`/?code=${item.stock_code}`)}
-            >
-              <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-              
-              <div className="p-5 flex-1 flex flex-col gap-4 relative z-10">
-                {/* Header: Name & Code */}
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h3 className="text-xl font-bold tracking-tight text-foreground">{item.stock_name}</h3>
-                    <p className="text-sm text-muted-foreground">{item.stock_code}</p>
-                  </div>
-                  <div className={`px-3 py-1 rounded-full text-xs font-medium border flex items-center ${getWyckoffColor(item.wyckoff?.phase)}`}>
-                    {getWyckoffIcon(item.wyckoff?.phase)}
-                    {item.wyckoff?.phase ? item.wyckoff.phase.toUpperCase() : "분석 대기"}
-                    {item.wyckoff?.confidence && <span className="ml-1 opacity-70">({item.wyckoff.confidence}%)</span>}
-                  </div>
-                </div>
-
-                {/* Backtest Section */}
-                <div className="flex-1 bg-black/20 rounded-xl p-4 border border-white/5 flex flex-col justify-center">
-                  {item.backtest ? (
-                    <div className="space-y-3">
-                      <div className="text-xs text-muted-foreground flex items-center justify-between">
-                        <span className="flex items-center gap-1"><Zap className="w-3 h-3 text-yellow-500" /> AI 전략</span>
-                        <span className="font-medium text-foreground truncate ml-2" title={item.backtest.best_strategy_name}>
-                          {item.backtest.best_strategy_name}
-                        </span>
-                      </div>
-                      
-                      <div className="grid grid-cols-3 gap-2 pt-2 border-t border-white/5">
-                        <div className="flex flex-col">
-                          <span className="text-[10px] text-muted-foreground uppercase">승률</span>
-                          <span className={`text-sm font-bold ${item.backtest.win_rate >= 50 ? 'text-green-400' : 'text-red-400'}`}>
-                            {item.backtest.win_rate.toFixed(1)}%
-                          </span>
-                        </div>
-                        <div className="flex flex-col border-l border-white/5 pl-2">
-                          <span className="text-[10px] text-muted-foreground uppercase">누적수익</span>
-                          <span className={`text-sm font-bold ${item.backtest.total_return > 0 ? 'text-green-400' : 'text-red-400'}`}>
-                            {item.backtest.total_return > 0 ? '+' : ''}{item.backtest.total_return.toFixed(1)}%
-                          </span>
-                        </div>
-                        <div className="flex flex-col border-l border-white/5 pl-2">
-                          <span className="text-[10px] text-muted-foreground uppercase">MDD</span>
-                          <span className="text-sm font-bold text-orange-400">
-                            {item.backtest.mdd.toFixed(1)}%
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="text-center py-4 flex flex-col items-center justify-center text-muted-foreground gap-2">
-                      <Activity className="w-6 h-6 opacity-50" />
-                      <span className="text-sm">백테스트 분석 중...</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Footer */}
-              <div className="px-5 py-3 border-t border-white/5 bg-white/[0.02] flex justify-between items-center group-hover:bg-primary/10 transition-colors">
-                <span className="text-xs font-medium text-muted-foreground group-hover:text-primary transition-colors">상세 분석 보기</span>
-                <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-transform group-hover:translate-x-1" />
-              </div>
-            </div>
+            />
           ))}
         </div>
       )}
     </div>
   );
 }
+
+// Sub-component for individual watchlist stock cards to handle dynamic backtest fetching
+function WatchlistCard({ item, onClick }: { item: WatchlistItem; onClick: () => void }) {
+  const [backtest, setBacktest] = useState(item.backtest);
+  const [loadingBacktest, setLoadingBacktest] = useState(!item.backtest);
+
+  useEffect(() => {
+    if (!item.backtest) {
+      setLoadingBacktest(true);
+      fetchBacktestSummaryAction(item.stock_code)
+        .then((res) => {
+          if (res.success && res.data) {
+            setBacktest(res.data);
+          }
+        })
+        .catch((err) => console.error("Dynamic backtest load error:", err))
+        .finally(() => setLoadingBacktest(false));
+    } else {
+      setBacktest(item.backtest);
+      setLoadingBacktest(false);
+    }
+  }, [item.stock_code, item.backtest]);
+
+  return (
+    <div 
+      className="group relative overflow-hidden rounded-2xl border border-white/10 bg-card/40 hover:bg-card/60 backdrop-blur-md transition-all duration-300 hover:shadow-xl hover:shadow-primary/5 hover:-translate-y-1 cursor-pointer flex flex-col"
+      onClick={onClick}
+    >
+      <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+      
+      <div className="p-5 flex-1 flex flex-col gap-4 relative z-10">
+        {/* Header: Name & Code */}
+        <div className="flex justify-between items-start">
+          <div>
+            <h3 className="text-xl font-bold tracking-tight text-foreground">{item.stock_name}</h3>
+            <p className="text-sm text-muted-foreground">{item.stock_code}</p>
+          </div>
+          <div className={`px-3 py-1 rounded-full text-xs font-medium border flex items-center ${getWyckoffColor(item.wyckoff?.phase)}`}>
+            {getWyckoffIcon(item.wyckoff?.phase)}
+            {item.wyckoff?.phase ? item.wyckoff.phase.toUpperCase() : "분석 대기"}
+            {item.wyckoff?.confidence && <span className="ml-1 opacity-70">({item.wyckoff.confidence}%)</span>}
+          </div>
+        </div>
+
+        {/* Backtest Section */}
+        <div className="flex-1 bg-black/20 rounded-xl p-4 border border-white/5 flex flex-col justify-center min-h-[110px]">
+          {loadingBacktest ? (
+            <div className="text-center py-4 flex flex-col items-center justify-center text-muted-foreground gap-2">
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary"></div>
+              <span className="text-[11px] animate-pulse">백테스트 분석 중...</span>
+            </div>
+          ) : backtest ? (
+            <div className="space-y-3 animate-in fade-in duration-300">
+              <div className="text-xs text-muted-foreground flex items-center justify-between">
+                <span className="flex items-center gap-1"><Zap className="w-3 h-3 text-yellow-500" /> AI 전략</span>
+                <span className="font-medium text-foreground truncate ml-2 max-w-[150px]" title={backtest.best_strategy_name}>
+                  {backtest.best_strategy_name}
+                </span>
+              </div>
+              
+              <div className="grid grid-cols-3 gap-2 pt-2 border-t border-white/5">
+                <div className="flex flex-col">
+                  <span className="text-[10px] text-muted-foreground uppercase">승률</span>
+                  <span className={`text-sm font-bold ${backtest.win_rate >= 50 ? 'text-green-400' : 'text-red-400'}`}>
+                    {backtest.win_rate.toFixed(1)}%
+                  </span>
+                </div>
+                <div className="flex flex-col border-l border-white/5 pl-2">
+                  <span className="text-[10px] text-muted-foreground uppercase">누적수익</span>
+                  <span className={`text-sm font-bold ${backtest.total_return > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    {backtest.total_return > 0 ? '+' : ''}{backtest.total_return.toFixed(1)}%
+                  </span>
+                </div>
+                <div className="flex flex-col border-l border-white/5 pl-2">
+                  <span className="text-[10px] text-muted-foreground uppercase">MDD</span>
+                  <span className="text-sm font-bold text-orange-400">
+                    {backtest.mdd.toFixed(1)}%
+                  </span>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-4 flex flex-col items-center justify-center text-muted-foreground gap-2">
+              <Activity className="w-6 h-6 opacity-50" />
+              <span className="text-sm">백테스트 분석 없음</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div className="px-5 py-3 border-t border-white/5 bg-white/[0.02] flex justify-between items-center group-hover:bg-primary/10 transition-colors">
+        <span className="text-xs font-medium text-muted-foreground group-hover:text-primary transition-colors">상세 분석 보기</span>
+        <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-transform group-hover:translate-x-1" />
+      </div>
+    </div>
+  );
+}
+
+// Helpers moved to module scope
+const getWyckoffColor = (phase: string | null | undefined) => {
+  if (!phase) return "bg-gray-500/10 text-gray-400 border-gray-500/20";
+  switch (phase.toLowerCase()) {
+    case "accumulation": return "bg-blue-500/10 text-blue-400 border-blue-500/20";
+    case "markup": return "bg-green-500/10 text-green-400 border-green-500/20";
+    case "distribution": return "bg-red-500/10 text-red-400 border-red-500/20";
+    case "markdown": return "bg-orange-500/10 text-orange-400 border-orange-500/20";
+    default: return "bg-gray-500/10 text-gray-400 border-gray-500/20";
+  }
+};
+
+const getWyckoffIcon = (phase: string | null | undefined) => {
+  if (!phase) return <Info className="w-4 h-4 mr-1" />;
+  switch (phase.toLowerCase()) {
+    case "accumulation": return <ShieldCheck className="w-4 h-4 mr-1" />;
+    case "markup": return <TrendingUp className="w-4 h-4 mr-1" />;
+    case "distribution": return <AlertTriangle className="w-4 h-4 mr-1" />;
+    case "markdown": return <Activity className="w-4 h-4 mr-1" />;
+    default: return <Info className="w-4 h-4 mr-1" />;
+  }
+};

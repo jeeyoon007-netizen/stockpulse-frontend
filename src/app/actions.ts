@@ -469,9 +469,9 @@ export async function fetchWatchlistDetailsAction(nickname: string) {
     // (supabase rpc 또는 in 쿼리 후 코드별 맵핑 처리)
     const { data: analysisLogs, error: logErr } = await supabase
       .from('analysis_logs')
-      .select('stock_code, wyckoff_phase, wyckoff_confidence, analyzed_at')
+      .select('stock_code, wyckoff_phase, wyckoff_confidence, created_at')
       .in('stock_code', stockCodes)
-      .order('analyzed_at', { ascending: false });
+      .order('created_at', { ascending: false });
 
     if (logErr) console.error("Watchlist Analysis Logs Error:", logErr.message);
 
