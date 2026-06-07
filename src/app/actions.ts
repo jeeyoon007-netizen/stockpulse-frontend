@@ -186,6 +186,14 @@ export async function fetchMarketOverviewAction(): Promise<IndexPriceData[]> {
   // 1. 백엔드 브릿지 경로
   try {
     const res = await fetch(`${BACKEND_URL}/api/v1/market/overview`, { cache: 'no-store', signal: AbortSignal.timeout(4000) });
+    if (res.status === 202) {
+      const retryData = await res.json();
+      if (retryData.retryAfter) {
+         console.log(`[ACTION] 마켓 오버뷰 초기화 중... ${retryData.retryAfter}초 대기 후 재시도`);
+         await delay(retryData.retryAfter * 1000);
+         return fetchMarketOverviewAction();
+      }
+    }
     if (res.ok) {
       const data = await res.json();
       console.log("[ACTION] [BRIDGE] 백엔드로부터 마켓 오버뷰 지수 로드 성공");
@@ -256,6 +264,14 @@ export async function fetchFearGreedAction(): Promise<FearGreedResponse | null> 
   // 1. 백엔드 브릿지 경로
   try {
     const res = await fetch(`${BACKEND_URL}/api/v1/market/fear-greed`, { cache: 'no-store', signal: AbortSignal.timeout(4000) });
+    if (res.status === 202) {
+      const retryData = await res.json();
+      if (retryData.retryAfter) {
+         console.log(`[ACTION] 공포탐욕 초기화 중... ${retryData.retryAfter}초 대기 후 재시도`);
+         await delay(retryData.retryAfter * 1000);
+         return fetchFearGreedAction();
+      }
+    }
     if (res.ok) {
       const data = await res.json();
       console.log("[ACTION] [BRIDGE] 백엔드로부터 공포탐욕지수 로드 성공");
@@ -286,6 +302,14 @@ export async function fetchCanaryDataAction() {
   // 1. 백엔드 브릿지 경로
   try {
     const res = await fetch(`${BACKEND_URL}/api/v1/market/canary`, { cache: 'no-store', signal: AbortSignal.timeout(5000) });
+    if (res.status === 202) {
+      const retryData = await res.json();
+      if (retryData.retryAfter) {
+         console.log(`[ACTION] 카나리아 초기화 중... ${retryData.retryAfter}초 대기 후 재시도`);
+         await delay(retryData.retryAfter * 1000);
+         return fetchCanaryDataAction();
+      }
+    }
     if (res.ok) {
       const data = await res.json();
       
