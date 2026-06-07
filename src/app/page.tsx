@@ -145,9 +145,9 @@ export default function DashboardPage() {
       .then(data => {
         setStocks(data);
         
-        // URL의 ?code=402340 쿼리 파라미터가 존재할 시 자동 분석 실행
+        // URL의 ?code= 또는 ?q= 쿼리 파라미터가 존재할 시 자동 분석 실행
         const params = new URLSearchParams(window.location.search);
-        const codeFromUrl = params.get("code");
+        const codeFromUrl = params.get("code") || params.get("q");
         if (codeFromUrl && codeFromUrl.length >= 6) {
           setStockCode(codeFromUrl);
           const match = data.find((s: any) => s.code === codeFromUrl);

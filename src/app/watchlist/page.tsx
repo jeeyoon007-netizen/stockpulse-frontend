@@ -165,7 +165,7 @@ export default function WatchlistPage() {
             <div 
               key={item.stock_code} 
               className="group relative overflow-hidden rounded-2xl border border-white/10 bg-card/40 hover:bg-card/60 backdrop-blur-md transition-all duration-300 hover:shadow-xl hover:shadow-primary/5 hover:-translate-y-1 cursor-pointer flex flex-col"
-              onClick={() => router.push(`/?q=${item.stock_code}`)}
+              onClick={() => router.push(`/?code=${item.stock_code}`)}
             >
               <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
               
