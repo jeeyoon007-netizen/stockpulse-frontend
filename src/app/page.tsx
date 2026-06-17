@@ -37,6 +37,7 @@ import {
   fetchCanaryDataAction,
   fetchMarketOverviewAction,
   fetchBacktestSummaryAction,
+  fetchStockChartDataAction,
   getDebugInfoAction,
   type AnalysisMode
 } from "./actions";
@@ -67,17 +68,15 @@ const clientMemoryCache: MemoryCache = {
 
 const MEMORY_CACHE_EXPIRY_MS = 5 * 60 * 1000; // 5분 캐시 만료 시간
 
-const ANALYSIS_MODES = [
-  { key: "scalp",    label: "단타",  desc: "모멘텀 우선 (당일~3일)" },
-  { key: "swing",    label: "스윙",  desc: "추세 중심 (1~4주)" },
-  { key: "position", label: "장기",  desc: "구조 우선 (1개월+)" },
+// 차트 기간 탭 (기존 단타/스윙/장기 모드를 차트 주기로 변경)
+const CHART_PERIODS = [
+  { key: "D", label: "일봉", desc: "기본 분석 주기 (240일)" },
+  { key: "W", label: "주봉", desc: "중장기 추세 (240주)" },
+  { key: "1", label: "1분봉", desc: "당일 단기 흐름 (최대 240봉)" },
 ] as const;
+type ChartPeriod = 'D' | 'W' | '1';
 
-const WEIGHT_PROFILES = {
-  scalp:    { trend: 0.20, energy: 0.30, momentum: 0.50 },
-  swing:    { trend: 0.40, energy: 0.35, momentum: 0.25 },
-  position: { trend: 0.55, energy: 0.30, momentum: 0.15 },
-} as const;
+
 
 const STATE_STYLES = {
   AGGRESSIVE_LONG: { color: "text-red-500",       bg: "bg-red-500/10",   border: "border-red-500/30" },
@@ -217,7 +216,29 @@ export default function DashboardPage() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [loadingStep, setLoadingStep] = useState(0);
   const [analysisResult, setAnalysisResult] = useState<StockAnalysisResponse | null>(null);
-  const [mode, setMode] = useState<AnalysisMode>("scalp");
+  
+  // 차트 상태
+  const [chartPeriod, setChartPeriod] = useState<ChartPeriod>("D");
+  const [chartData, setChartData] = useState<any[]>([]);
+  const [isLoadingChart, setIsLoadingChart] = useState(false);
+  
+  // 차트 데이터 변경 로직 (종목코드 또는 주기가 변경될 때)
+  useEffect(() => {
+    if (analysisResult?.success && analysisResult.stockData?.code) {
+      const code = analysisResult.stockData.code;
+      setIsLoadingChart(true);
+      fetchStockChartDataAction(code, chartPeriod)
+        .then(res => {
+          if (res.success && res.data?.ohlcv) {
+            setChartData(res.data.ohlcv);
+          } else {
+            console.error("차트 데이터 로드 실패", res.error);
+          }
+        })
+        .catch(err => console.error("차트 에러:", err))
+        .finally(() => setIsLoadingChart(false));
+    }
+  }, [analysisResult?.stockData?.code, chartPeriod]);
 
   // 분석 결과 완료 시 백테스트 타점 정보 자동 조회
   useEffect(() => {
@@ -232,15 +253,9 @@ export default function DashboardPage() {
         const cachedData = memoryCached.data;
         setBacktestSummary(cachedData);
         
-        // 현재 선택된 mode에 매칭되는 trades를 동적으로 필터링하여 설정
+        // 백테스트에서 단타/스윙/장기 모드는 분리하지 않기로 했으므로 전체/최적 전략 매핑 (현재는 항상 최적 렌더링 유지)
         if (cachedData.all_strategies) {
-          const modeLabelMapping: Record<string, string> = {
-            'scalp': 'AI 분석 (단타)',
-            'swing': 'AI 분석 (스윙)',
-            'position': 'AI 분석 (장기투자)'
-          };
-          const targetLabel = modeLabelMapping[mode];
-          const targetStrategy = cachedData.all_strategies.find((s: any) => s.strategy_name === targetLabel);
+          const targetStrategy = cachedData.all_strategies.find((s: any) => s.strategy_name === cachedData.best_strategy_name);
           if (targetStrategy && targetStrategy.trades) {
             setBacktestTrades(targetStrategy.trades);
             return;
@@ -262,15 +277,9 @@ export default function DashboardPage() {
 
             setBacktestSummary(json.data);
             
-            // 현재 선택된 mode에 매칭되는 trades를 동적으로 필터링하여 설정
+            // 백테스트에서 단타/스윙/장기 모드는 분리하지 않기로 했으므로 최적 전략 매핑
             if (json.data.all_strategies) {
-              const modeLabelMapping: Record<string, string> = {
-                'scalp': 'AI 분석 (단타)',
-                'swing': 'AI 분석 (스윙)',
-                'position': 'AI 분석 (장기투자)'
-              };
-              const targetLabel = modeLabelMapping[mode];
-              const targetStrategy = json.data.all_strategies.find((s: any) => s.strategy_name === targetLabel);
+              const targetStrategy = json.data.all_strategies.find((s: any) => s.strategy_name === json.data.best_strategy_name);
               if (targetStrategy && targetStrategy.trades) {
                 setBacktestTrades(targetStrategy.trades);
                 return;
@@ -300,17 +309,10 @@ export default function DashboardPage() {
     }
   }, [analysisResult]);
 
-  // 사용자가 선택한 mode 탭이 바뀌거나 backtestSummary가 새로 로드되었을 때,
-  // 그에 부합하는 개별 전략의 trades를 즉시 추출하여 차트에 반영 (렉 없는 즉각 전환)
+  // 사용자가 선택한 mode 탭이 바뀌거나 backtestSummary가 새로 로드되었을 때 (현재 모드 기능은 제거되었으므로 기본 단타 전략 매핑, 추후 백테스트 로직에서 모드 구분 제거 완료됨)
   useEffect(() => {
     if (backtestSummary && backtestSummary.all_strategies) {
-      const modeLabelMapping: Record<string, string> = {
-        'scalp': 'AI 분석 (단타)',
-        'swing': 'AI 분석 (스윙)',
-        'position': 'AI 분석 (장기투자)'
-      };
-      const targetLabel = modeLabelMapping[mode];
-      const targetStrategy = backtestSummary.all_strategies.find((s: any) => s.strategy_name === targetLabel);
+      const targetStrategy = backtestSummary.all_strategies.find((s: any) => s.strategy_name === backtestSummary.best_strategy_name);
       if (targetStrategy && targetStrategy.trades) {
         setBacktestTrades(targetStrategy.trades);
       } else {
@@ -318,7 +320,7 @@ export default function DashboardPage() {
         setBacktestTrades(backtestSummary.trades || []);
       }
     }
-  }, [mode, backtestSummary]);
+  }, [backtestSummary]);
 
   const filteredStocks = searchInput
     ? stocks.filter(s => s.name.toLowerCase().includes(searchInput.toLowerCase()) || s.code.includes(searchInput)).slice(0, 6)
@@ -339,7 +341,7 @@ export default function DashboardPage() {
     forceRefresh = false
   ) => {
     const target = codeToAnalyze || stockCode || searchInput;
-    const activeMode = modeToAnalyze || mode;
+    const activeMode = 'scalp'; // 백엔드 분석은 항상 scalp를 기준으로 실행
     if (!target || target.length < 6) return;
     
     // stocksOverride가 있으면 사용 (useEffect 내부에서 호출 시 React state 반영 전이므로 직접 전달)
@@ -601,59 +603,25 @@ export default function DashboardPage() {
               <div className="space-y-6 animate-in zoom-in-95 duration-500">
                 <Separator className="bg-border/50" />
                 
-                {/* 단기, 스윙, 장기 탭 버튼 */}
+                {/* 차트 주기 탭 버튼 */}
                 <div className="flex bg-muted/40 p-0.5 rounded-lg text-xs font-bold border border-border/50 mb-4">
-                  {ANALYSIS_MODES.map(m => (
+                  {CHART_PERIODS.map(p => (
                     <button
-                      key={m.key}
-                      onClick={() => {
-                        setMode(m.key);
-                        if (analysisResult?.success) {
-                          handleAnalyze(stockCode, m.key);
-                        }
-                      }}
+                      key={p.key}
+                      onClick={() => setChartPeriod(p.key as ChartPeriod)}
                       className={`flex-1 py-1.5 px-3 rounded-md transition-all ${
-                        mode === m.key
+                        chartPeriod === p.key
                           ? 'bg-background text-primary shadow-sm'
                           : 'text-muted-foreground hover:text-foreground'
                       }`}
                     >
-                      {m.label}
-                      <span className="hidden sm:block text-[9px] font-normal opacity-60 mt-0.5">{m.desc}</span>
+                      {p.label}
+                      <span className="hidden sm:block text-[9px] font-normal opacity-60 mt-0.5">{p.desc}</span>
                     </button>
                   ))}
                 </div>
 
-                {/* 실시간 3인 전문가 분석 기여도 분포 가로 바 */}
-                <div className="bg-background/30 rounded-xl p-3.5 border border-border/50 space-y-2 mb-6 animate-in fade-in duration-300">
-                  <div className="flex justify-between items-center text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                    <span>실시간 3인 전문가 의사결정 기여도</span>
-                    <span className="font-mono text-primary bg-primary/10 px-2.5 py-0.5 rounded-md border border-primary/20 text-[9px]">{mode.toUpperCase()} 모드</span>
-                  </div>
-                  <div className="h-3.5 w-full rounded-full overflow-hidden flex bg-muted/50 border border-border/30 shadow-inner">
-                    <div 
-                      className="bg-stock-up/85 hover:bg-stock-up transition-all duration-300 relative flex items-center justify-center"
-                      style={{ width: `${Math.round(WEIGHT_PROFILES[mode].momentum * 100)}%` }}
-                      title={`모멘텀 전문가: ${Math.round(WEIGHT_PROFILES[mode].momentum * 100)}%`}
-                    >
-                      <span className="text-[8px] font-black text-white opacity-95 truncate px-1">모멘텀 {Math.round(WEIGHT_PROFILES[mode].momentum * 100)}%</span>
-                    </div>
-                    <div 
-                      className="bg-amber-400/85 hover:bg-amber-400 transition-all duration-300 relative flex items-center justify-center"
-                      style={{ width: `${Math.round(WEIGHT_PROFILES[mode].trend * 100)}%` }}
-                      title={`파동/추세 전문가: ${Math.round(WEIGHT_PROFILES[mode].trend * 100)}%`}
-                    >
-                      <span className="text-[8px] font-black text-slate-900 opacity-95 truncate px-1">추세 {Math.round(WEIGHT_PROFILES[mode].trend * 100)}%</span>
-                    </div>
-                    <div 
-                      className="bg-blue-400/85 hover:bg-blue-400 transition-all duration-300 relative flex items-center justify-center"
-                      style={{ width: `${Math.round(WEIGHT_PROFILES[mode].energy * 100)}%` }}
-                      title={`에너지 전문가: ${Math.round(WEIGHT_PROFILES[mode].energy * 100)}%`}
-                    >
-                      <span className="text-[8px] font-black text-white opacity-95 truncate px-1">수급 {Math.round(WEIGHT_PROFILES[mode].energy * 100)}%</span>
-                    </div>
-                  </div>
-                </div>
+
 
                 <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
                   <div>
@@ -665,7 +633,7 @@ export default function DashboardPage() {
                           variant="outline"
                           size="sm"
                           className="gap-1.5 text-muted-foreground hover:text-foreground"
-                          onClick={() => handleAnalyze(analysisResult.stockData.code, mode, undefined, true)}
+                          onClick={() => handleAnalyze(analysisResult.stockData.code, undefined, undefined, true)}
                           disabled={isAnalyzing}
                         >
                           <RefreshCw className={`w-3.5 h-3.5 ${isAnalyzing ? "animate-spin" : ""}`} />
@@ -827,44 +795,55 @@ export default function DashboardPage() {
                 )}
 
                 {/* 차트 영역을 분석 종목 주가 정보 밑(3인 전문가 및 기타 상세 의견 위)에 위치시킴 */}
-                {analysisResult.stockData.ohlcv && (
-                  <div className="bg-background/40 rounded-xl overflow-hidden border border-border/50 p-3 shadow-inner mt-2 animate-in fade-in duration-500 w-full">
-                    <TradingViewChart 
-                      data={analysisResult.stockData.ohlcv} 
-                      trades={backtestTrades} 
-                      swingLevels={analysisResult.analysis?.swingLevels}
-                      volumeProfile={{
-                        poc: analysisResult.analysis?.indicators?.volumeProfile240?.poc,
-                        vah: analysisResult.analysis?.indicators?.volumeProfile240?.vah,
-                        val: analysisResult.analysis?.indicators?.volumeProfile240?.val,
-                      }}
-                    />
-                    
-                    {/* 선 지표 설명 안내 영역 */}
-                    <div className="mt-3 px-2 pt-3 border-t border-border/30 grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-muted-foreground">
-                      <div className="space-y-1">
-                        <span className="font-bold text-foreground flex items-center gap-1.5">
-                          <span className="w-1 h-3 bg-amber-500 rounded-sm"></span>
-                          📊 볼륨 프로파일 (Volume Profile)
-                        </span>
-                        <p className="leading-relaxed text-[11px] text-muted-foreground/95">
-                          <span className="text-amber-400 font-semibold">🟡 POC (Point of Control)</span>: 가장 많은 거래량이 누적된 핵심 가격대로 강력한 지지/저항 역할을 합니다.<br/>
-                          <span className="text-foreground/70 font-semibold">⚪ VAH / VAL (가치영역 상/하단)</span>: 매물의 약 70%가 집중된 구간의 경계선입니다.
-                        </p>
-                      </div>
-                      <div className="space-y-1">
-                        <span className="font-bold text-foreground flex items-center gap-1.5">
-                          <span className="w-1 h-3 bg-primary rounded-sm"></span>
-                          📈 스윙 구조선 (Swing Levels)
-                        </span>
-                        <p className="leading-relaxed text-[11px] text-muted-foreground/95">
-                          <span className="text-red-400 font-semibold">🔴 Res (Resistance)</span>: 최근 고점들을 연결한 매물 저항 구간입니다.<br/>
-                          <span className="text-blue-400 font-semibold">🔵 Sup (Support)</span>: 최근 저점들을 연결한 매물 지지 구간이자 주요 손절선입니다.
-                        </p>
+                <div className="bg-background/40 rounded-xl overflow-hidden border border-border/50 p-3 shadow-inner mt-2 w-full relative min-h-[300px]">
+                  {isLoadingChart ? (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/50 backdrop-blur-sm z-10">
+                      <RefreshCw className="w-8 h-8 text-primary animate-spin mb-2" />
+                      <span className="text-sm font-bold text-muted-foreground animate-pulse">차트 데이터 불러오는 중...</span>
+                    </div>
+                  ) : chartData && chartData.length > 0 ? (
+                    <div className="animate-in fade-in duration-500">
+                      <TradingViewChart 
+                        data={chartData} 
+                        trades={backtestTrades} 
+                        swingLevels={analysisResult.analysis?.swingLevels}
+                        volumeProfile={{
+                          poc: analysisResult.analysis?.indicators?.volumeProfile240?.poc,
+                          vah: analysisResult.analysis?.indicators?.volumeProfile240?.vah,
+                          val: analysisResult.analysis?.indicators?.volumeProfile240?.val,
+                        }}
+                      />
+                      
+                      {/* 선 지표 설명 안내 영역 */}
+                      <div className="mt-3 px-2 pt-3 border-t border-border/30 grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-muted-foreground">
+                        <div className="space-y-1">
+                          <span className="font-bold text-foreground flex items-center gap-1.5">
+                            <span className="w-1 h-3 bg-amber-500 rounded-sm"></span>
+                            📊 볼륨 프로파일 (Volume Profile)
+                          </span>
+                          <p className="leading-relaxed text-[11px] text-muted-foreground/95">
+                            <span className="text-amber-400 font-semibold">🟡 POC (Point of Control)</span>: 가장 많은 거래량이 누적된 핵심 가격대로 강력한 지지/저항 역할을 합니다.<br/>
+                            <span className="text-foreground/70 font-semibold">⚪ VAH / VAL (가치영역 상/하단)</span>: 매물의 약 70%가 집중된 구간의 경계선입니다.
+                          </p>
+                        </div>
+                        <div className="space-y-1">
+                          <span className="font-bold text-foreground flex items-center gap-1.5">
+                            <span className="w-1 h-3 bg-primary rounded-sm"></span>
+                            📈 스윙 구조선 (Swing Levels)
+                          </span>
+                          <p className="leading-relaxed text-[11px] text-muted-foreground/95">
+                            <span className="text-red-400 font-semibold">🔴 Res (Resistance)</span>: 최근 고점들을 연결한 매물 저항 구간입니다.<br/>
+                            <span className="text-blue-400 font-semibold">🔵 Sup (Support)</span>: 최근 저점들을 연결한 매물 지지 구간이자 주요 손절선입니다.
+                          </p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )}
+                  ) : (
+                    <div className="absolute inset-0 flex items-center justify-center text-muted-foreground text-sm">
+                      차트 데이터를 불러올 수 없습니다.
+                    </div>
+                  )}
+                </div>
 
                 {analysisResult.analysis.veto?.triggered && (
                   <div className="flex items-center gap-3.5 p-4 bg-red-500/10 border border-red-500/30 rounded-lg text-xs font-bold text-red-400 animate-in fade-in">
@@ -888,14 +867,6 @@ export default function DashboardPage() {
                 {/* 3인 전문가 카드 */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {analysisResult.analysis.experts.map((exp, idx) => {
-                    const getWeight = (name: string) => {
-                      if (name.includes("추세")) return WEIGHT_PROFILES[mode].trend;
-                      if (name.includes("에너지")) return WEIGHT_PROFILES[mode].energy;
-                      if (name.includes("모멘텀")) return WEIGHT_PROFILES[mode].momentum;
-                      return 0;
-                    };
-                    const weightPercent = Math.round(getWeight(exp.expertName) * 100);
-
                     return (
                       <div key={idx} className="bg-background/80 rounded-xl p-4 border border-border/50 shadow-sm relative overflow-hidden group hover:scale-[1.02] transition-transform duration-300">
                         <div className={`absolute top-0 right-0 w-1.5 h-full ${directionColor(exp.opinion).replace('text-', 'bg-')} opacity-30`}/>
@@ -906,14 +877,8 @@ export default function DashboardPage() {
                             <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${directionColor(exp.opinion).replace('text-', 'bg-')}/10 ${directionColor(exp.opinion)}`}>{exp.opinion}</span>
                           </div>
                         </h4>
-                        
-                        {/* 반영 가중치 배지 */}
-                        <div className="text-[9px] font-bold text-muted-foreground/80 mb-2 flex items-center gap-1">
-                          <Zap className="w-2.5 h-2.5 text-amber-400" />
-                          최종 의사결정 반영 비중: <span className="text-primary font-mono font-bold">{weightPercent}%</span>
-                        </div>
 
-                        <div className="flex items-center gap-2 mb-3">
+                        <div className="flex items-center gap-2 mb-3 mt-2">
                             <Progress value={exp.confidence} className="h-1 flex-1 bg-secondary" />
                             <span className="text-[9px] font-mono font-bold text-muted-foreground">{exp.confidence}%</span>
                         </div>

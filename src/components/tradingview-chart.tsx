@@ -59,13 +59,31 @@ export function TradingViewChart({ data, trades, swingLevels, volumeProfile }: T
 
     const sortedData = [...data].sort((a, b) => a.date.localeCompare(b.date));
     
-    // YYYYMMDD 포맷을 YYYY-MM-DD 포맷으로 변환 (lightweight-charts 포맷 요구)
+    // YYYYMMDD 또는 YYYY-MM-DD HH:mm 포맷 변환 (lightweight-charts 요구사항 충족)
     const chartData = sortedData.map((d) => {
-      const year = d.date.substring(0, 4);
-      const month = d.date.substring(4, 6);
-      const day = d.date.substring(6, 8);
+      let timeValue: any;
+      
+      if (d.date.includes(':')) {
+        // 1분봉 포맷: YYYY-MM-DD HH:mm
+        // KST 기준(UTC+9)이므로, lightweight-charts가 로컬로 해석하지 않도록
+        // UTC 시간(UNIX Timestamp, 초 단위)으로 변환해서 주입
+        const [datePart, timePart] = d.date.split(' ');
+        const [year, month, day] = datePart.split('-');
+        const [hour, minute] = timePart.split(':');
+        
+        // KST 시간을 기반으로 Date 객체 생성 (이 방식은 로컬 시스템의 타임존에 영향받으므로 명시적 UTC 연산)
+        const dateObj = new Date(`${year}-${month}-${day}T${hour}:${minute}:00+09:00`);
+        timeValue = Math.floor(dateObj.getTime() / 1000); // Unix Timestamp (seconds)
+      } else {
+        // 일봉 포맷: YYYYMMDD
+        const year = d.date.substring(0, 4);
+        const month = d.date.substring(4, 6);
+        const day = d.date.substring(6, 8);
+        timeValue = `${year}-${month}-${day}`; // String format for daily
+      }
+
       return {
-        time: `${year}-${month}-${day}`,
+        time: timeValue,
         open: d.open,
         high: d.high,
         low: d.low,

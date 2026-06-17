@@ -579,5 +579,21 @@ export async function getDebugInfoAction() {
   };
 }
 
-
-
+export async function fetchStockChartDataAction(code: string, period: '1' | 'D' | 'W' = 'D') {
+  try {
+    const res = await fetch(`${BACKEND_URL}/api/v1/chart/ohlcv?code=${code}&period=${period}`, {
+      cache: "no-store",
+    });
+    
+    if (!res.ok) {
+      const errorText = await res.text();
+      return { success: false, error: `Failed to fetch chart data: ${res.status} ${errorText}` };
+    }
+    
+    const data = await res.json();
+    return data;
+  } catch (error: any) {
+    console.error("fetchStockChartDataAction error:", error);
+    return { success: false, error: error.message };
+  }
+}
