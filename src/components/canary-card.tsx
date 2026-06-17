@@ -209,7 +209,7 @@ export function CanaryCard({ data, marketOverview, onAnalyze }: Props) {
   }
 
   return (
-    <div className="flex flex-col p-3 md:p-4 bg-background/40 rounded-xl border border-border/50 h-full hover:border-chart-3/30 transition-all">
+    <div className="flex flex-col p-3 md:p-4 bg-background/40 rounded-xl border border-border/50 h-full hover:border-chart-3/30 transition-all min-w-0">
       <div className="flex justify-between items-center mb-4 md:mb-6">
         <h3 className="text-xs md:text-sm font-extrabold text-foreground tracking-tight flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-orange-500 animate-pulse shadow-[0_0_8px_rgba(249,115,22,0.8)]"></span>

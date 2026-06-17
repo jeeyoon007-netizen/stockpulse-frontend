@@ -64,7 +64,7 @@ export function InvestorFlowCard({ onAnalyze }: { onAnalyze?: (code: string, nam
   );
 
   return (
-    <div className="flex flex-col p-4 bg-background/40 rounded-xl border border-border/50 h-full overflow-hidden hover:border-chart-2/30 transition-all group relative">
+    <div className="flex flex-col p-4 bg-background/40 rounded-xl border border-border/50 h-full overflow-hidden hover:border-chart-2/30 transition-all group relative min-w-0">
       <div className="flex justify-between items-center mb-5">
         <h3 className="text-xs md:text-sm font-extrabold text-foreground tracking-tight flex items-center gap-2">
             <Users className="w-4 h-4 text-chart-2" />
@@ -82,7 +82,7 @@ export function InvestorFlowCard({ onAnalyze }: { onAnalyze?: (code: string, nam
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto scrollbar-hide space-y-6">
+      <div className="flex-1 overflow-y-auto scrollbar-hide space-y-6 min-w-0">
         {loading ? (
             <div className="grid grid-cols-2 gap-4 mt-2">
                 <div className="space-y-2">
@@ -93,9 +93,9 @@ export function InvestorFlowCard({ onAnalyze }: { onAnalyze?: (code: string, nam
                 </div>
             </div>
         ) : analysis ? (
-            <div className="space-y-6">
+            <div className="space-y-6 min-w-0">
                 {/* Lists side-by-side on desktop, stacked on mobile */}
-                <div className="flex flex-col sm:flex-row gap-4">
+                <div className="flex flex-col sm:flex-row gap-4 min-w-0">
                     <StockList title="외국인" data={analysis.foreignTop10} icon={Users} color="text-chart-2" />
                     <StockList title="기관" data={analysis.instTop10} icon={Building} color="text-chart-4" />
                 </div>

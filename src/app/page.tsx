@@ -977,9 +977,9 @@ export default function DashboardPage() {
       </section>
 
       {/* --- [Market Indicators Section: Canary | Temperature | Investor Flow] --- */}
-      <section id="market-indicators" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-[1fr_0.8fr_1.2fr] gap-4 md:gap-6">
+      <section id="market-indicators" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,1.2fr)] gap-4 md:gap-6 w-full overflow-hidden">
         {/* [Canary] */}
-        <div className="flex flex-col h-full animate-in fade-in slide-in-from-left-4 duration-500 delay-100">
+        <div className="flex flex-col h-full min-w-0 animate-in fade-in slide-in-from-left-4 duration-500 delay-100">
            <CanaryCard 
              data={canaryData} 
              marketOverview={marketOverview}
@@ -992,9 +992,9 @@ export default function DashboardPage() {
         </div>
 
         {/* [Temperature] */}
-        <div className="flex flex-col h-full animate-in fade-in slide-in-from-bottom-4 duration-500 delay-200">
+        <div className="flex flex-col h-full min-w-0 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-200">
            {fearGreedData ? (
-             <div className="grid grid-cols-1 gap-4 h-full">
+             <div className="grid grid-cols-1 gap-4 h-full min-w-0">
                 <FearGreedGauge data={fearGreedData.kr} title="KOREA MARKET TEMPERATURE" />
                 <FearGreedGauge data={fearGreedData.us} title="US MARKET TEMPERATURE" />
              </div>
@@ -1006,7 +1006,7 @@ export default function DashboardPage() {
         </div>
 
         {/* [Investor Flow] */}
-        <div className="flex flex-col h-full animate-in fade-in slide-in-from-right-4 duration-500 delay-300">
+        <div className="flex flex-col h-full min-w-0 animate-in fade-in slide-in-from-right-4 duration-500 delay-300">
            <InvestorFlowCard 
              onAnalyze={(code, name) => {
                setStockCode(code);
