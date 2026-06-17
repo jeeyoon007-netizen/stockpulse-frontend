@@ -54,6 +54,7 @@ import { type IndexPriceData } from "@/lib/api/kis-market";
 interface MemoryCache {
   analysis: Record<string, { timestamp: number; data: StockAnalysisResponse }>;
   backtest: Record<string, { timestamp: number; data: any }>;
+  chart: Record<string, { timestamp: number; data: any[] }>; // key: `${code}_${period}`
   marketOverview: { timestamp: number; data: IndexPriceData[] } | null;
   fearGreedData: { timestamp: number; data: FearGreedResponse } | null;
   canaryData: { timestamp: number; data: any } | null;
@@ -62,6 +63,7 @@ interface MemoryCache {
 const clientMemoryCache: MemoryCache = {
   analysis: {},
   backtest: {},
+  chart: {},
   marketOverview: null,
   fearGreedData: null,
   canaryData: null,
@@ -214,21 +216,53 @@ function DashboardPageContent() {
   const [chartPeriod, setChartPeriod] = useState<ChartPeriod>("D");
   const [chartData, setChartData] = useState<any[]>([]);
   const [isLoadingChart, setIsLoadingChart] = useState(false);
-  
+  const [chartError, setChartError] = useState<string | null>(null);
+
   // 차트 데이터 변경 로직 (종목코드 또는 주기가 변경될 때)
   useEffect(() => {
     if (analysisResult?.success && analysisResult.stockData?.code) {
       const code = analysisResult.stockData.code;
+      const cacheKey = `${code}_${chartPeriod}`;
+
+      // 1) 메모리 캐시 히트 시 즉시 반환 (탭 간 이동 시 재로딩 방지)
+      const cached = clientMemoryCache.chart[cacheKey];
+      if (cached && Date.now() - cached.timestamp < MEMORY_CACHE_EXPIRY_MS) {
+        console.log(`[CHART CACHE HIT] ${cacheKey}`);
+        setChartData(cached.data);
+        setChartError(null);
+        return;
+      }
+
+      // 2) 캐시 미스: 로딩 시작 전 이전 데이터 클리어 (주봉=일봉 잔류 방지)
+      setChartData([]);
+      setChartError(null);
       setIsLoadingChart(true);
+
       fetchStockChartDataAction(code, chartPeriod)
         .then(res => {
-          if (res.success && res.data?.ohlcv) {
+          if (res.success && res.data?.ohlcv && res.data.ohlcv.length > 0) {
+            clientMemoryCache.chart[cacheKey] = { timestamp: Date.now(), data: res.data.ohlcv };
             setChartData(res.data.ohlcv);
+            setChartError(null);
           } else {
-            console.error("차트 데이터 로드 실패", res.error);
+            // 데이터 없음 – 이유를 사용자에게 전달
+            setChartData([]);
+            const apiError = res.error || "";
+            if (chartPeriod === "1") {
+              setChartError("NO_MINUTE_DATA");
+            } else if (chartPeriod === "W") {
+              setChartError(apiError || "주봉 데이터를 불러오지 못했습니다.");
+            } else {
+              setChartError(apiError || "차트 데이터를 불러오지 못했습니다.");
+            }
+            console.warn("차트 데이터 없음", res.error);
           }
         })
-        .catch(err => console.error("차트 에러:", err))
+        .catch(err => {
+          console.error("차트 에러:", err);
+          setChartData([]);
+          setChartError(err.message || "네트워크 오류");
+        })
         .finally(() => setIsLoadingChart(false));
     }
   }, [analysisResult?.stockData?.code, chartPeriod]);
@@ -662,7 +696,14 @@ function DashboardPageContent() {
                           : 'text-muted-foreground hover:text-foreground'
                       }`}
                     >
-                      {p.label}
+                      <span className="flex items-center justify-center gap-1">
+                        {p.label}
+                        {p.key === '1' && (
+                          <span className="hidden sm:inline text-[8px] font-semibold bg-amber-500/20 text-amber-400 border border-amber-500/30 px-1 py-0.5 rounded leading-none">
+                            장중
+                          </span>
+                        )}
+                      </span>
                       <span className="hidden sm:block text-[9px] font-normal opacity-60 mt-0.5">{p.desc}</span>
                     </button>
                   ))}
@@ -886,8 +927,36 @@ function DashboardPageContent() {
                       </div>
                     </div>
                   ) : (
-                    <div className="absolute inset-0 flex items-center justify-center text-muted-foreground text-sm">
-                      차트 데이터를 불러올 수 없습니다.
+                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center">
+                      {chartError === 'NO_MINUTE_DATA' ? (
+                        <>
+                          <div className="text-4xl">🕐</div>
+                          <div>
+                            <p className="font-bold text-base text-foreground/80">1분봉 데이터가 없습니다</p>
+                            <p className="text-sm text-muted-foreground mt-1">
+                              장 운영 시간
+                              <span className="font-mono font-bold text-amber-400 mx-1">09:00 ~ 15:30</span>
+                              에만 당일 1분봉을 조회할 수 있습니다.
+                            </p>
+                            <p className="text-xs text-muted-foreground/60 mt-1.5">
+                              현재 시각: {new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })} &nbsp;·&nbsp; 일봉/주봉은 언제든지 조회 가능합니다.
+                            </p>
+                          </div>
+                        </>
+                      ) : chartError ? (
+                        <>
+                          <div className="text-4xl">⚠️</div>
+                          <div>
+                            <p className="font-bold text-base text-foreground/80">차트를 불러오지 못했습니다</p>
+                            <p className="text-xs text-muted-foreground/80 mt-1 font-mono bg-muted/50 px-3 py-1.5 rounded border border-border/50 max-w-xs">{chartError}</p>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="text-4xl opacity-40">📊</div>
+                          <p className="text-muted-foreground text-sm">차트 데이터를 불러오는 중입니다...</p>
+                        </>
+                      )}
                     </div>
                   )}
                 </div>
