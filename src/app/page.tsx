@@ -137,8 +137,10 @@ function DashboardPageContent() {
 
   const searchParams = useSearchParams();
   const codeFromUrl = searchParams.get("code") || searchParams.get("q");
-  // stocks 로드 완료 여부를 추적하는 ref (URL 기반 분석 트리거 타이밍 동기화용)
+  // stocks 데이터를 ref로도 추적 (useEffect deps 배열에서 배열 객체 reference 불안정 문제 방지)
   const stocksLoadedRef = useRef<{code: string, name: string, market: string}[]>([]);
+  // stocks.json 로드 완료 후 즉시 분석을 실행할 수 있도록 triggerAnalysis 함수를 ref에 저장
+  const triggerAnalysisFnRef = useRef<((code: string | null) => void) | null>(null);
 
   useEffect(() => {
     setTimeStr(new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" }));
@@ -150,6 +152,14 @@ function DashboardPageContent() {
       .then(data => {
         stocksLoadedRef.current = data;
         setStocks(data);
+        // stocks 로드 완료 시점에 triggerAnalysisFn이 등록되어 있으면 즉시 실행
+        // (codeFromUrl이 이미 있었지만 stocks가 없어 bail out된 케이스 커버)
+        if (triggerAnalysisFnRef.current) {
+          triggerAnalysisFnRef.current(
+            new URLSearchParams(window.location.search).get("code")
+            || new URLSearchParams(window.location.search).get("q")
+          );
+        }
       })
       .catch(err => console.error("stocks.json 로드 실패:", err));
 
@@ -429,31 +439,57 @@ function DashboardPageContent() {
 
   // URL 쿼리파라미터(?code=) 또는 stocks 로드 완료 시 분석 트리거
   // - useSearchParams() 덕분에 같은 경로(/) 내에서 URL만 바뀌어도 이 Effect가 재실행됨
-  // - 즐겨찾기 카드를 눌러 router.push('/?code=XXXXXX')를 할 때,
-  //   컴포넌트가 재마운트되지 않아도 codeFromUrl 값이 바뀌어 선택 종목 분석이 올바르게 실행됨
+  // - stocks를 deps에 넣으면 배열 reference 불안정으로 모바일에서 타이밍 오류 발생
+  //   → stocksLoadedRef로 동기적으로 접근하고 deps에는 넣지 않음
+  // - 모바일 iOS bfcache: pageshow 이벤트에서도 동일한 로직 실행
   useEffect(() => {
-    // stocks가 아직 로드되지 않았으면 대기 (stocks.json fetch 후 재실행)
-    if (stocks.length === 0) return;
+    const triggerAnalysis = (currentCode: string | null) => {
+      // stocksLoadedRef에 데이터가 없으면 아직 stocks.json 로드 전이므로 대기
+      const activeStocks = stocksLoadedRef.current;
+      if (activeStocks.length === 0) return;
 
-    if (codeFromUrl && codeFromUrl.length >= 6) {
-      // URL에 종목코드가 있으면 → 해당 종목 분석 (즐겨찾기 → 대시보드 케이스)
-      setStockCode(codeFromUrl);
-      const match = stocks.find((s) => s.code === codeFromUrl);
-      setSearchInput(match?.name || codeFromUrl);
-      handleAnalyze(codeFromUrl, undefined, stocks);
-    } else {
-      // URL 코드 없을 때 → 로컬스토리지 최근 종목 복원 (초기 진입 케이스)
-      const lastCode = localStorage.getItem("stockpulse_last_analyzed_code");
-      const lastName = localStorage.getItem("stockpulse_last_analyzed_name");
-      if (lastCode && lastCode.length >= 6) {
-        setStockCode(lastCode);
-        const match = stocks.find((s) => s.code === lastCode);
-        setSearchInput(match?.name || lastName || lastCode);
-        handleAnalyze(lastCode, undefined, stocks);
+      if (currentCode && currentCode.length >= 6) {
+        // URL에 종목코드가 있으면 → 해당 종목 분석 (즐겨찾기 → 대시보드 케이스)
+        setStockCode(currentCode);
+        const match = activeStocks.find((s) => s.code === currentCode);
+        setSearchInput(match?.name || currentCode);
+        handleAnalyze(currentCode, undefined, activeStocks);
+      } else {
+        // URL 코드 없을 때 → 로컬스토리지 최근 종목 복원 (초기 진입 케이스)
+        const lastCode = localStorage.getItem("stockpulse_last_analyzed_code");
+        const lastName = localStorage.getItem("stockpulse_last_analyzed_name");
+        if (lastCode && lastCode.length >= 6) {
+          setStockCode(lastCode);
+          const match = activeStocks.find((s) => s.code === lastCode);
+          setSearchInput(match?.name || lastName || lastCode);
+          handleAnalyze(lastCode, undefined, activeStocks);
+        }
       }
-    }
+    };
+
+    triggerAnalysis(codeFromUrl);
+
+    // stocks.json 로드 완료 대기 케이스: 이 함수를 ref에 등록해두면
+    // stocks.json fetch가 나중에 완료될 때 즉시 호출 가능
+    triggerAnalysisFnRef.current = triggerAnalysis;
+
+    // 모바일 iOS bfcache 복원 대응: 페이지가 캐시에서 복원될 때에도 올바른 종목 분석 실행
+    const handlePageShow = (e: PageTransitionEvent) => {
+      if (e.persisted) {
+        // bfcache에서 복원된 경우 → 현재 URL의 code param으로 재분석
+        const currentCode = new URLSearchParams(window.location.search).get("code")
+          || new URLSearchParams(window.location.search).get("q");
+        triggerAnalysis(currentCode);
+      }
+    };
+
+    window.addEventListener("pageshow", handlePageShow);
+    return () => {
+      window.removeEventListener("pageshow", handlePageShow);
+      triggerAnalysisFnRef.current = null;
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [codeFromUrl, stocks]);
+  }, [codeFromUrl]);
 
   return (
     <div className="px-3 py-3 md:px-6 md:py-6 lg:px-8 lg:py-8 space-y-4 md:space-y-8 w-full max-w-[1600px] mx-auto pb-20">
