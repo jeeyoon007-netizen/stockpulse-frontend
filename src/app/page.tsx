@@ -592,8 +592,13 @@ function DashboardPageContent() {
                 <Badge variant="secondary" className="bg-primary/20 text-primary border-primary/30">v2.0 Beta</Badge>
               </div>
             </div>
-            <CardDescription className="text-sm">
-              3인의 가상 전문가 논쟁을 통한 피보나치 & ATR 기반 정밀 타점 산출
+            <CardDescription className="text-sm flex flex-col gap-1.5 mt-1">
+              <span>3인의 가상 전문가 논쟁을 통한 피보나치 &amp; ATR 기반 정밀 타점 산출</span>
+              <span className="flex items-center gap-1.5 text-xs text-muted-foreground/80">
+                <span className="inline-flex items-center gap-1 bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2 py-0.5 rounded-full font-medium">
+                  📅 1년 차트 (240일) 데이터 기반 분석
+                </span>
+              </span>
             </CardDescription>
           </CardHeader>
           
