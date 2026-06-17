@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   TrendingUp,
   TrendingDown,
@@ -115,7 +116,7 @@ function directionColor(direction: "up" | "down" | "flat" | string) {
   return "text-stock-flat";
 }
 
-export default function DashboardPage() {
+function DashboardPageContent() {
   const [timeStr, setTimeStr] = useState("");
   const [stocks, setStocks] = useState<{code: string, name: string, market: string}[]>([]);
 
@@ -134,39 +135,21 @@ export default function DashboardPage() {
   const [backtestError, setBacktestError] = useState<string | null>(null);
   const [debugInfo, setDebugInfo] = useState<any>(null);
 
+  const searchParams = useSearchParams();
+  const codeFromUrl = searchParams.get("code") || searchParams.get("q");
+  // stocks 로드 완료 여부를 추적하는 ref (URL 기반 분석 트리거 타이밍 동기화용)
+  const stocksLoadedRef = useRef<{code: string, name: string, market: string}[]>([]);
+
   useEffect(() => {
     setTimeStr(new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" }));
     getDebugInfoAction().then(setDebugInfo).catch(err => console.error("Debug info error:", err));
     
-    // 종목 마스터 JSON 로드
+    // 종목 마스터 JSON 로드 (초기 1회만)
     fetch("/stocks.json")
       .then(res => res.json())
       .then(data => {
+        stocksLoadedRef.current = data;
         setStocks(data);
-        
-        // URL의 ?code= 또는 ?q= 쿼리 파라미터가 존재할 시 자동 분석 실행
-        const params = new URLSearchParams(window.location.search);
-        const codeFromUrl = params.get("code") || params.get("q");
-        if (codeFromUrl && codeFromUrl.length >= 6) {
-          setStockCode(codeFromUrl);
-          const match = data.find((s: any) => s.code === codeFromUrl);
-          if (match) {
-            setSearchInput(match.name);
-          } else {
-            setSearchInput(codeFromUrl);
-          }
-          handleAnalyze(codeFromUrl, undefined, data);
-        } else {
-          // 로컬스토리지에서 최근 분석 종목 로드
-          const lastCode = localStorage.getItem("stockpulse_last_analyzed_code");
-          const lastName = localStorage.getItem("stockpulse_last_analyzed_name");
-          if (lastCode && lastCode.length >= 6) {
-            setStockCode(lastCode);
-            const match = data.find((s: any) => s.code === lastCode);
-            setSearchInput(match?.name || lastName || lastCode);
-            handleAnalyze(lastCode, undefined, data);
-          }
-        }
       })
       .catch(err => console.error("stocks.json 로드 실패:", err));
 
@@ -443,6 +426,34 @@ export default function DashboardPage() {
       setIsAnalyzing(false);
     }
   };
+
+  // URL 쿼리파라미터(?code=) 또는 stocks 로드 완료 시 분석 트리거
+  // - useSearchParams() 덕분에 같은 경로(/) 내에서 URL만 바뀌어도 이 Effect가 재실행됨
+  // - 즐겨찾기 카드를 눌러 router.push('/?code=XXXXXX')를 할 때,
+  //   컴포넌트가 재마운트되지 않아도 codeFromUrl 값이 바뀌어 선택 종목 분석이 올바르게 실행됨
+  useEffect(() => {
+    // stocks가 아직 로드되지 않았으면 대기 (stocks.json fetch 후 재실행)
+    if (stocks.length === 0) return;
+
+    if (codeFromUrl && codeFromUrl.length >= 6) {
+      // URL에 종목코드가 있으면 → 해당 종목 분석 (즐겨찾기 → 대시보드 케이스)
+      setStockCode(codeFromUrl);
+      const match = stocks.find((s) => s.code === codeFromUrl);
+      setSearchInput(match?.name || codeFromUrl);
+      handleAnalyze(codeFromUrl, undefined, stocks);
+    } else {
+      // URL 코드 없을 때 → 로컬스토리지 최근 종목 복원 (초기 진입 케이스)
+      const lastCode = localStorage.getItem("stockpulse_last_analyzed_code");
+      const lastName = localStorage.getItem("stockpulse_last_analyzed_name");
+      if (lastCode && lastCode.length >= 6) {
+        setStockCode(lastCode);
+        const match = stocks.find((s) => s.code === lastCode);
+        setSearchInput(match?.name || lastName || lastCode);
+        handleAnalyze(lastCode, undefined, stocks);
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [codeFromUrl, stocks]);
 
   return (
     <div className="px-3 py-3 md:px-6 md:py-6 lg:px-8 lg:py-8 space-y-4 md:space-y-8 w-full max-w-[1600px] mx-auto pb-20">
@@ -983,5 +994,13 @@ export default function DashboardPage() {
       </section>
 
     </div>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" /></div>}>
+      <DashboardPageContent />
+    </Suspense>
   );
 }
