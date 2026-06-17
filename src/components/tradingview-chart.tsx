@@ -53,6 +53,10 @@ export function TradingViewChart({ data, trades, swingLevels, volumeProfile }: T
   useEffect(() => {
     if (!chartContainerRef.current || !data || data.length === 0) return;
 
+    // HMR(Fast Refresh) 및 React Strict Mode 더블 렌더링 시 
+    // 이전 차트 엘리먼트가 메모리/DOM에 잔존하는 것을 방지하기 위해 컨테이너 내부를 완전히 비웁니다.
+    chartContainerRef.current.innerHTML = "";
+
     const sortedData = [...data].sort((a, b) => a.date.localeCompare(b.date));
     
     // YYYYMMDD 포맷을 YYYY-MM-DD 포맷으로 변환 (lightweight-charts 포맷 요구)
