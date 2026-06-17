@@ -46,9 +46,9 @@ export function InvestorFlowCard({ onAnalyze }: { onAnalyze?: (code: string, nam
                     <div className="flex items-center gap-2.5 min-w-0">
                         <span className="text-[10px] md:text-[11px] text-muted-foreground/80 font-mono font-bold w-3.5 shrink-0">{idx + 1}</span>
                         <div className="flex flex-col min-w-0">
-                            <span className="text-[11.5px] md:text-xs font-extrabold text-foreground truncate max-w-[95px]">{item.name}</span>
+                            <span className="text-[11.5px] md:text-xs font-extrabold text-foreground truncate max-w-[140px] sm:max-w-[95px] md:max-w-[110px] lg:max-w-none">{item.name}</span>
                             {item.badge && item.badge !== "" && (
-                                <span className="text-amber-400 text-[9px] md:text-[10px] font-bold truncate max-w-[110px] leading-tight mt-0.5" title={item.badge}>
+                                <span className="text-amber-400 text-[9px] md:text-[10px] font-bold truncate max-w-[160px] sm:max-w-[110px] lg:max-w-none leading-tight mt-0.5" title={item.badge}>
                                     {item.badge}
                                 </span>
                             )}
@@ -94,8 +94,8 @@ export function InvestorFlowCard({ onAnalyze }: { onAnalyze?: (code: string, nam
             </div>
         ) : analysis ? (
             <div className="space-y-6">
-                {/* Lists side-by-side */}
-                <div className="flex gap-4">
+                {/* Lists side-by-side on desktop, stacked on mobile */}
+                <div className="flex flex-col sm:flex-row gap-4">
                     <StockList title="외국인" data={analysis.foreignTop10} icon={Users} color="text-chart-2" />
                     <StockList title="기관" data={analysis.instTop10} icon={Building} color="text-chart-4" />
                 </div>

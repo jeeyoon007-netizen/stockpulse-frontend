@@ -69,7 +69,7 @@ export function TradingViewChart({ data, trades, swingLevels, volumeProfile }: T
       };
     });
 
-    const chartHeight = isMobile ? 240 : 360;
+    const chartHeight = isMobile ? 220 : 360;
 
     const chart = createChart(chartContainerRef.current, {
       layout: {
@@ -115,7 +115,7 @@ export function TradingViewChart({ data, trades, swingLevels, volumeProfile }: T
     candleSeries.setData(chartData as any);
 
     // 백테스트 매매 마커 추가
-    if (trades && trades.length > 0) {
+    if (trades && trades.length > 0 && !isMobile) {
       const markers = trades.map(t => {
         const year = t.trade_date.substring(0, 4);
         const month = t.trade_date.substring(4, 6);
@@ -130,19 +130,27 @@ export function TradingViewChart({ data, trades, swingLevels, volumeProfile }: T
       });
       // @ts-ignore
       candleSeries.setMarkers(markers);
+    } else {
+      // @ts-ignore
+      candleSeries.setMarkers([]);
     }
 
     // 스윙 레벨 (지지/저항선) 추가
     if (swingLevels && swingLevels.length > 0) {
-      swingLevels.forEach((level) => {
+      const limit = isMobile ? 1 : 2;
+      const highs = swingLevels.filter(l => l.type === 'HIGH').sort((a, b) => b.index - a.index).slice(0, limit);
+      const lows = swingLevels.filter(l => l.type === 'LOW').sort((a, b) => b.index - a.index).slice(0, limit);
+      const displaySwingLevels = [...highs, ...lows];
+
+      displaySwingLevels.forEach((level) => {
         const isHigh = level.type === 'HIGH';
         candleSeries.createPriceLine({
           price: level.price,
           color: isHigh ? 'rgba(239, 68, 68, 0.4)' : 'rgba(59, 130, 246, 0.4)', // 붉은색(저항), 푸른색(지지) + 투명도
-          lineWidth: isHigh ? 1 : 2,
+          lineWidth: isMobile ? 1 : (isHigh ? 1 : 2),
           lineStyle: 2, // 2: Dashed
           axisLabelVisible: true,
-          title: isHigh ? 'Res' : 'Sup',
+          title: '',
         });
       });
     }
@@ -156,7 +164,7 @@ export function TradingViewChart({ data, trades, swingLevels, volumeProfile }: T
           lineWidth: 2,
           lineStyle: 0, // 0: Solid
           axisLabelVisible: true,
-          title: 'POC',
+          title: '',
         });
       }
       if (volumeProfile.vah) {
@@ -166,7 +174,7 @@ export function TradingViewChart({ data, trades, swingLevels, volumeProfile }: T
           lineWidth: 1,
           lineStyle: 2, // Dashed
           axisLabelVisible: true,
-          title: 'VAH',
+          title: '',
         });
       }
       if (volumeProfile.val) {
@@ -176,7 +184,7 @@ export function TradingViewChart({ data, trades, swingLevels, volumeProfile }: T
           lineWidth: 1,
           lineStyle: 2, // Dashed
           axisLabelVisible: true,
-          title: 'VAL',
+          title: '',
         });
       }
     }
@@ -198,7 +206,7 @@ export function TradingViewChart({ data, trades, swingLevels, volumeProfile }: T
       resizeObserver.disconnect();
       chart.remove();
     };
-  }, [data, isMobile, trades]);
+  }, [data, isMobile, trades, swingLevels, volumeProfile]);
 
-  return <div ref={chartContainerRef} className="w-full h-[240px] md:h-[360px]" />;
+  return <div ref={chartContainerRef} className="w-full h-[220px] md:h-[360px]" />;
 }

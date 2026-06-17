@@ -443,7 +443,7 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="px-5 py-4 md:px-6 md:py-6 lg:px-8 lg:py-8 space-y-6 md:space-y-8 w-full max-w-[1600px] mx-auto">
+    <div className="px-3 py-3 md:px-6 md:py-6 lg:px-8 lg:py-8 space-y-4 md:space-y-8 w-full max-w-[1600px] mx-auto pb-20">
       {/* Page Header */}
       <header className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
@@ -619,7 +619,7 @@ export default function DashboardPage() {
                       }`}
                     >
                       {m.label}
-                      <span className="block text-[9px] font-normal opacity-60">{m.desc}</span>
+                      <span className="hidden sm:block text-[9px] font-normal opacity-60 mt-0.5">{m.desc}</span>
                     </button>
                   ))}
                 </div>
@@ -977,7 +977,7 @@ export default function DashboardPage() {
       </section>
 
       {/* --- [Market Indicators Section: Canary | Temperature | Investor Flow] --- */}
-      <section id="market-indicators" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+      <section id="market-indicators" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-[1fr_0.8fr_1.2fr] gap-4 md:gap-6">
         {/* [Canary] */}
         <div className="flex flex-col h-full animate-in fade-in slide-in-from-left-4 duration-500 delay-100">
            <CanaryCard 
