@@ -74,7 +74,7 @@ const MEMORY_CACHE_EXPIRY_MS = 5 * 60 * 1000; // 5분 캐시 만료 시간
 // 차트 기간 탭 (기존 단타/스윙/장기 모드를 차트 주기로 변경)
 const CHART_PERIODS = [
   { key: "D", label: "일봉", desc: "기본 분석 주기 (240일)" },
-  { key: "W", label: "주봉", desc: "중장기 추세 (2년/104주)" },
+  { key: "W", label: "주봉", desc: "중장기 추세 (약 2년/100주)" },
   { key: "1", label: "1분봉", desc: "당일 단기 흐름 (최대 240봉)" },
 ] as const;
 type ChartPeriod = 'D' | 'W' | '1';
